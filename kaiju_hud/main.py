@@ -161,7 +161,7 @@ class DeckHUD(QMainWindow):
     # APPLY STYLESHEET
     # -------------------------
     def apply_stylesheet(self, css: str):
-        self.setStyleSheet(css)
+        QApplication.instance().setStyleSheet(css)
 
 
 def main():

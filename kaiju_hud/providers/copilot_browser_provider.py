@@ -96,7 +96,7 @@ class CopilotWorker(QThread):
 
             self._browser = self._playwright.chromium.launch_persistent_context(
                 user_data_dir=self.session_dir,
-                headless=True,
+                headless=False,  # visible for first-time login; set True after session is saved
                 args=["--no-sandbox"],
             )
 
