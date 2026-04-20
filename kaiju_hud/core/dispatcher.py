@@ -4,12 +4,18 @@ from PyQt6.QtCore import QObject, pyqtSignal, QDateTime, QTimer
 from typing import List, Dict, Callable
 
 
+# Canonical dispatch order — always respected regardless of targets list
+DISPATCH_ORDER = ["claude", "chatgpt", "grok", "copilot", "local"]
+
+
 class Dispatcher(QObject):
     # Emitted when a response is ready for a specific AI
     # ui panels connect to this and filter by ai_name
     response_signal = pyqtSignal(str, str)      # ai_name, content
     # Emitted when a user message is sent to a specific AI
     user_message_signal = pyqtSignal(str, str)  # ai_name, content
+    # Emitted by streaming providers for each token chunk
+    chunk_signal = pyqtSignal(str, str)          # ai_name, chunk_text
 
     def __init__(self, db_client=None, parent=None):
         super().__init__(parent)
@@ -49,12 +55,20 @@ class Dispatcher(QObject):
         if "all" in targets:
             targets = list(self.providers.keys())
 
-        # Sequential dispatch: 1.5s between each provider
+        # Import here to avoid circular imports at module load time
+        from core.column_manager import ColumnManager
+
+        # Sequential dispatch in canonical order: 1.5s between each provider
         delay_ms = 0
         step_ms = 1500
 
-        for ai_name in targets:
+        for ai_name in DISPATCH_ORDER:
+            if ai_name not in targets:
+                continue
             if ai_name not in self.providers:
+                continue
+            # Skip collapsed/hidden columns to avoid wasting API tokens
+            if not ColumnManager.instance().is_active(ai_name):
                 continue
 
             message_id = self._make_message_id(ai_name)
@@ -69,10 +83,8 @@ class Dispatcher(QObject):
 
             handler = self.providers[ai_name]
 
-            # Schedule provider call to avoid thread storms
+            # Schedule provider call with stagger to avoid thread storms
             def _invoke_provider(name=ai_name, msg=content, r=role, mid=message_id):
-                # Provider is responsible for async/threading and must call
-                # dispatcher.on_provider_response(name, response, mid)
                 handler_ref = self.providers.get(name)
                 if handler_ref:
                     handler_ref(msg, r)
@@ -102,6 +114,10 @@ class Dispatcher(QObject):
 
         # Emit to UI
         self.response_signal.emit(ai_name, content)
+
+    def on_provider_chunk(self, ai_name: str, chunk: str):
+        """Called by streaming providers for each token chunk."""
+        self.chunk_signal.emit(ai_name, chunk)
 
     # ---------- HOOK FOR FUTURE ANALYTICS ----------
 

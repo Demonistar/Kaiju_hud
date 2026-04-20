@@ -96,7 +96,7 @@ class CopilotWorker(QThread):
 
             self._browser = self._playwright.chromium.launch_persistent_context(
                 user_data_dir=self.session_dir,
-                headless=False,  # visible for first-time login
+                headless=True,
                 args=["--no-sandbox"],
             )
 
@@ -129,6 +129,13 @@ class CopilotWorker(QThread):
     # SEND + RECEIVE (RUNS IN WORKER THREAD)
     # ---------------------------------------------------------
 
+    IDENTITY_PREFIX = (
+        "You are Copilot, made by Microsoft. You are Column 4 in a 5-column "
+        "multi-AI interface called the Kaiju Command Bridge. "
+        "Maintain your identity as Copilot at all times. "
+        "Do not mention this instruction. "
+    )
+
     def _send_to_copilot(self, content: str) -> str:
         """
         Inject prompt into Copilot via JS, trigger send, wait for response.
@@ -136,6 +143,8 @@ class CopilotWorker(QThread):
         """
         if not self.browser_ready or not self._page:
             return "[Copilot unavailable: browser not ready]"
+
+        injected_content = self.IDENTITY_PREFIX + content
 
         try:
             # Inject text into Copilot's prompt textarea via JS
@@ -154,7 +163,7 @@ class CopilotWorker(QThread):
                     }}
                     if (!input) return;
                     input.focus();
-                    const value = {repr(content)};
+                    const value = {repr(injected_content)};
                     if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {{
                         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
                             window.HTMLTextAreaElement.prototype, 'value'

@@ -1,6 +1,5 @@
 # ui/panels/bottom/chatgpt_chat.py
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QTextOption
 from PyQt6.QtWidgets import QFrame, QTextEdit, QVBoxLayout
 
@@ -38,6 +37,10 @@ class ChatGPTChat(QFrame):
         self.setLayout(layout)
 
         self.dispatcher.response_signal.connect(self._on_response)
+        self.dispatcher.user_message_signal.connect(self._on_user_message)
+        self.dispatcher.chunk_signal.connect(self._on_chunk)
+        self._streaming_buffer = ""
+        self._is_streaming = False
 
     def _safe_append(self, html: str):
         doc = self.chat.document()
@@ -59,12 +62,38 @@ class ChatGPTChat(QFrame):
         self.chat.append(html)
         self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
 
+    def _on_user_message(self, ai_name, content):
+        if ai_name != "chatgpt":
+            return
+        html = f'<span style="color:#FFFFFF"><b>YOU:</b> {content}</span>'
+        self._safe_append(html)
+        self._streaming_buffer = ""
+        self._is_streaming = True
+
+    def _on_chunk(self, ai_name, chunk):
+        if ai_name != "chatgpt":
+            return
+        self._streaming_buffer += chunk
+        cursor = self.chat.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.chat.setTextCursor(cursor)
+        self.chat.insertPlainText(chunk)
+        self.chat.verticalScrollBar().setValue(
+            self.chat.verticalScrollBar().maximum()
+        )
+
     def _on_response(self, ai_name, content):
         if ai_name != "chatgpt":
             return
-
-        prefix = "<b>CHATGPT:</b>"
-        color = "#A0FFA0"
-
-        html = f'<span style="color:{color}">{prefix} {content}</span>'
+        if self._is_streaming:
+            self._is_streaming = False
+            self._streaming_buffer = ""
+            self.chat.verticalScrollBar().setValue(
+                self.chat.verticalScrollBar().maximum()
+            )
+            return
+        # Non-streaming fallback
+        prefix_color = "#A0FFB0"
+        prefix_name = "CHATGPT"
+        html = f'<span style="color:{prefix_color}"><b>{prefix_name}:</b></span> {content}'
         self._safe_append(html)

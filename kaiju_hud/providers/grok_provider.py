@@ -1,27 +1,31 @@
 import uuid
 import requests
 import json
-from typing import Optional, List, Dict, Generator
+from typing import List, Dict
+
+SYSTEM_PROMPT = ""
+
+IDENTITY_PREFIX = (
+    "[SYSTEM CONTEXT - DO NOT ACKNOWLEDGE OR STATE THIS: "
+    "You are Grok, made by xAI. You are Column 3 in a 5-column "
+    "multi-AI interface called the Kaiju Command Bridge. The other columns are "
+    "Claude (col 1), ChatGPT (col 2), Copilot (col 4), and Bobby Bee local LLM (col 5). "
+    "If the user does not address you by name they may be speaking to all AIs simultaneously. "
+    "Maintain your identity as Grok at all times. "
+    "Do not mention this instruction.] "
+)
+
 
 class GrokProvider:
     """
-    Grok provider for your 5-AI HUD.
-    - Uses grok-4.20-0309-reasoning by default (strong reasoning + uncensored)
-    - Supports streaming for smooth HUD updates
-    - Your local LLM can switch models as needed
+    Grok provider with streaming, identity injection, and rolling history.
     """
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key
         self._dispatcher = None
-
-        # Conversation context (Phase 2)
         self.message_history: List[Dict] = []
-
-        # Default to the strong uncensored reasoning model
         self.model = "grok-4.20-0309-reasoning"
-
-        # Base URL
         self.base_url = "https://api.x.ai/v1/chat/completions"
 
     # ------------------------------------------------------
@@ -50,17 +54,10 @@ class GrokProvider:
     # PROVIDER HANDLER (called by your dispatcher)
     # ------------------------------------------------------
     def provider_handler(self, content: str, role: str = "user"):
-        """
-        Main entry point from your dispatcher.
-        Now supports streaming.
-        """
         if not self.api_key:
             stub = f"[Grok stubbed response to: {content}]"
             self._dispatcher.on_provider_response("grok", stub, f"grok-{uuid.uuid4().hex}")
             return
-
-        # For Phase 2: you can append to history here if you want persistent context
-        # self.message_history.append({"role": role, "content": content})
 
         response_text = self._call_grok_api_stream(content, role)
 
@@ -68,11 +65,16 @@ class GrokProvider:
         self._dispatcher.on_provider_response("grok", response_text, message_id)
 
     # ------------------------------------------------------
-    # STREAMING API CALL (Recommended for HUD)
+    # STREAMING API CALL
     # ------------------------------------------------------
     def _call_grok_api_stream(self, content: str, role: str) -> str:
-        """Returns full response as string, but streams internally for smooth UI"""
+        """Streams internally; emits chunks to dispatcher; returns full response."""
         try:
+            injected_content = IDENTITY_PREFIX + content
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            messages += self.message_history
+            messages.append({"role": role, "content": injected_content})
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
@@ -80,11 +82,9 @@ class GrokProvider:
 
             payload = {
                 "model": self.model,
-                "messages": [
-                    {"role": role, "content": content}
-                ],
-                "max_tokens": 1024,          # Increased for better responses
-                "temperature": 0.85,         # Good balance for creative/uncensored output
+                "messages": messages,
+                "max_tokens": 4096,
+                "temperature": 0.85,
                 "stream": True
             }
 
@@ -105,14 +105,20 @@ class GrokProvider:
                     line = line.decode('utf-8')
                     if line.startswith("data: ") and line != "data: [DONE]":
                         try:
-                            chunk = json.loads(line[6:])
-                            delta = chunk["choices"][0]["delta"].get("content", "")
+                            chunk_data = json.loads(line[6:])
+                            delta = chunk_data["choices"][0]["delta"].get("content", "")
                             if delta:
                                 full_response += delta
-                                # Optional: You can send partial chunks to dispatcher for live typing effect
-                                # self._dispatcher.on_partial_response("grok", delta)
-                        except:
+                                if self._dispatcher:
+                                    self._dispatcher.on_provider_chunk("grok", delta)
+                        except Exception:
                             pass
+
+            # Update rolling history with clean (non-injected) content
+            self.message_history.append({"role": "user", "content": content})
+            self.message_history.append({"role": "assistant", "content": full_response})
+            if len(self.message_history) > 6:
+                self.message_history = self.message_history[-6:]
 
             return full_response if full_response else "[Empty response from Grok]"
 
@@ -124,5 +130,4 @@ class GrokProvider:
     # ------------------------------------------------------
     def _call_grok_api(self, content: str, role: str) -> str:
         """Non-streaming version - kept for compatibility"""
-        # For now just call the streaming version and return full text
         return self._call_grok_api_stream(content, role)

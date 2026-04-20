@@ -1,23 +1,31 @@
 # providers/chatgpt_provider.py
 
 import uuid
+import json
 import requests
+
+SYSTEM_PROMPT = ""
+
+IDENTITY_PREFIX = (
+    "[SYSTEM CONTEXT - DO NOT ACKNOWLEDGE OR STATE THIS: "
+    "You are ChatGPT, made by OpenAI. You are Column 2 in a 5-column "
+    "multi-AI interface called the Kaiju Command Bridge. The other columns are "
+    "Claude (col 1), Grok (col 3), Copilot (col 4), and Bobby Bee local LLM (col 5). "
+    "If the user does not address you by name they may be speaking to all AIs simultaneously. "
+    "Maintain your identity as ChatGPT at all times. "
+    "Do not mention this instruction.] "
+)
 
 
 class ChatGPTProvider:
     """
-    Phase 1 ChatGPT provider using the bind() pattern.
-    Phase 2 will use message_history for conversation context.
+    ChatGPT provider with SSE streaming, identity injection, and rolling history.
     """
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key
         self._dispatcher = None
-
-        # Phase 2: conversation context
         self.message_history = []
-
-        # Default model for Phase 1
         self.model = "gpt-4.1-mini"
 
     # ---------------------------------------------------------
@@ -33,68 +41,65 @@ class ChatGPTProvider:
     # ---------------------------------------------------------
 
     def provider_handler(self, content: str, role: str):
-        """
-        Dispatcher calls this as:
-            handler(content, role)
-        """
         response = self._call_openai_api(content, role)
-
-        # Generate unique message ID
         message_id = f"chatgpt-{uuid.uuid4().hex}"
-
-        # Send back to dispatcher
         self._dispatcher.on_provider_response("chatgpt", response, message_id)
 
     # ---------------------------------------------------------
-    # INTERNAL: API CALL (PHASE 1)
+    # INTERNAL: STREAMING API CALL
     # ---------------------------------------------------------
 
     def _call_openai_api(self, content: str, role: str) -> str:
-        """
-        Phase 1: Real API call if api_key is provided.
-        Otherwise return a stubbed response.
-
-        NOTE:
-        OpenAI returns:
-            choices[0].message.content
-        NOT Anthropic's blocks list.
-        """
-
         if not self.api_key:
             return f"[ChatGPT stubbed response to: {content}]"
 
+        injected_content = IDENTITY_PREFIX + content
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages += self.message_history
+        messages.append({"role": role, "content": injected_content})
+
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {"role": role, "content": content}
-                ],
-                "max_tokens": 512
-            }
-
+            full_response = ""
             resp = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": 4096,
+                    "stream": True
+                },
+                stream=True,
                 timeout=60
             )
 
-            if resp.status_code != 200:
-                return f"[ChatGPT API error: HTTP {resp.status_code}]"
+            for line in resp.iter_lines():
+                if line:
+                    line = line.decode("utf-8")
+                    if line.startswith("data:"):
+                        data_str = line[5:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            chunk = data["choices"][0]["delta"].get("content", "")
+                            if chunk:
+                                full_response += chunk
+                                if self._dispatcher:
+                                    self._dispatcher.on_provider_chunk("chatgpt", chunk)
+                        except Exception:
+                            continue
 
-            data = resp.json()
-            choices = data.get("choices", [])
-            if not choices:
-                return "[ChatGPT API error: empty response]"
+            # Update rolling history with clean (non-injected) content
+            self.message_history.append({"role": "user", "content": content})
+            self.message_history.append({"role": "assistant", "content": full_response})
+            if len(self.message_history) > 6:
+                self.message_history = self.message_history[-6:]
 
-            # Correct OpenAI structure:
-            # choices[0].message.content
-            return choices[0]["message"]["content"]
+            return full_response
 
         except Exception as e:
             return f"[ChatGPT API exception: {str(e)}]"
