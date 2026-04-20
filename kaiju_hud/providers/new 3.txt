@@ -1,0 +1,12 @@
+D:
+cd D:\AI\Models
+python deck_builder.py
+
+dolphin-mistral
+
+D:
+cd D:\AI\Models\Morganna
+python morganna_deck.py
+
+
+https://www.moongiant.com/phase/today/
