@@ -2,8 +2,12 @@
 
 import json
 import os
+import threading
+import time
 import requests
 from datetime import datetime
+
+from storage.database import KaijuDatabase
 
 CONFIG_PATH = os.path.join("config", "ollama_location.json")
 
@@ -35,6 +39,14 @@ class OllamaClient:
 
         # Bobby Bee mode: "observer", "participate", "command"
         self.observer_mode = "participate"
+
+        self._history = []
+        self._db = KaijuDatabase()
+        self._current_key_id = None
+        self._background_watcher_running = False
+        self._current_topic = ""
+        self._current_keywords = ""
+        self._watcher_seen = {}
 
         self._load_cached_location()
         self._detect_ollama()
@@ -68,6 +80,8 @@ class OllamaClient:
         if not self.model_name:
             return "[Local LLM error: no model selected]"
 
+        self._history.append({"role": "user", "content": prompt})
+
         # Identity injection
         full_prompt = BOBBY_BEE_SYSTEM + "\n" + prompt
 
@@ -85,7 +99,9 @@ class OllamaClient:
                 return f"[Local LLM error: HTTP {resp.status_code}]"
 
             data = resp.json()
-            return data.get("response", "")
+            response = data.get("response", "")
+            self._history.append({"role": "assistant", "content": response})
+            return response
 
         except Exception:
             return "[Bobby Bee offline: Ollama not running]"
@@ -152,9 +168,96 @@ class OllamaClient:
         Handles observer mode and normal generation.
         """
         if self.observer_mode == "observer":
-            response = self.observe(content)
-        else:
-            response = self.generate(content)
+            response = "[Absorbed]"
+            message_id = f"local-{self._dispatcher._now_ms()}"
+            self._dispatcher.on_provider_response("local", response, message_id)
+            return
+
+        response = self.generate(content)
+        if self.observer_mode == "command":
+            response = "[COMMAND MODE] " + response
+
+        if self._current_key_id is not None:
+            self._db.update_response(self._current_key_id, "bobby_response", response)
 
         message_id = f"local-{self._dispatcher._now_ms()}"
         self._dispatcher.on_provider_response("local", response, message_id)
+
+        self._scan_and_write_lesson()
+
+    def _scan_and_write_lesson(self):
+        if self._current_key_id is None:
+            return
+
+        recent = self._db.get_recent_lessons(self._current_topic, self._current_keywords)
+        current = self._db.get_row(self._current_key_id)
+        response = (current.get("bobby_response") or "").strip()
+        summary = response.split(".")[0].strip()
+        if summary:
+            summary = summary + "."
+        else:
+            summary = "Bobby learned from this round."
+
+        matching = None
+        for row in recent:
+            if row.get("key_id") != self._current_key_id:
+                matching = row
+                break
+
+        if matching is None:
+            lesson = "[NEW] " + summary
+        else:
+            lesson = f"[KNOWN: key_id={matching.get('key_id')}] Similar lesson seen before."
+
+        self._db.update_response(self._current_key_id, "bobby_lesson", lesson)
+
+    def start_background_watcher(self):
+        if self._background_watcher_running:
+            return
+        self._background_watcher_running = True
+
+        def _watcher():
+            response_cols = [
+                "claude_response",
+                "chatgpt_response",
+                "grok_response",
+                "copilot_response",
+            ]
+            ai_map = {
+                "claude_response": "Claude",
+                "chatgpt_response": "ChatGPT",
+                "grok_response": "Grok",
+                "copilot_response": "Copilot",
+            }
+            while self._background_watcher_running:
+                open_rows = self._db._get_open_rows()
+                for row in open_rows:
+                    key_id = row.get("key_id")
+                    seen = self._watcher_seen.setdefault(key_id, {})
+                    for col in response_cols:
+                        prev = seen.get(col)
+                        curr = row.get(col)
+                        if prev is None and curr is not None:
+                            prompt = (row.get("user_prompt") or "")[:40]
+                            resp_snippet = str(curr)[:80]
+                            opened = row.get("timestamp_utc") or ""
+                            elapsed = "unknown"
+                            try:
+                                start = datetime.fromisoformat(opened.replace("Z", "+00:00"))
+                                elapsed_sec = int((datetime.utcnow() - start.replace(tzinfo=None)).total_seconds())
+                                elapsed = f"{elapsed_sec}s"
+                            except Exception:
+                                pass
+                            notice = (
+                                f"[NOTICE] {ai_map[col]} responded to \"{prompt}\" — "
+                                f"{elapsed}: {resp_snippet}"
+                            )
+                            if self._dispatcher is not None:
+                                message_id = f"local-{self._dispatcher._now_ms()}"
+                                self._dispatcher.on_provider_response("local", notice, message_id)
+                            self._db.update_late_response(key_id, "bobby_response", notice)
+                        seen[col] = curr
+                time.sleep(30)
+
+        thread = threading.Thread(target=_watcher, daemon=True)
+        thread.start()
