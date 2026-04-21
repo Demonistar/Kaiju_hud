@@ -1,0 +1,17 @@
+{
+    "api_keys": {
+        "claude": "",
+        "chatgpt": "",
+        "grok": ""
+    },
+    "last_theme": "classic",
+    "last_glow": "subtle",
+    "last_window_mode": "WI",
+    "columns": {
+        "claude": true,
+        "chatgpt": true,
+        "grok": true,
+        "copilot": true,
+        "local": true
+    }
+}

@@ -1,0 +1,192 @@
+════════════════════════════════════════════════════════════════
+ECHO DECK — FULL MODULE REGISTRY
+════════════════════════════════════════════════════════════════
+
+── GOOGLE ───────────────────────────────────────────────────────
+
+Module: Google Calendar + Tasks
+Status: BUILT
+Description: Bi-directional Google Calendar sync. Task registry with reminder parsing. Schedule events, set tasks, view upcoming items inside the deck.
+Full Summary: Working in GrimVeil. OAuth flow via google_credentials.json. Syncs calendar events and tasks. Reminder parser watches conversation for date/time intent and offers to create tasks. Google Calendar integration used by Cookbook and Shopping List modules for scheduling meals and grocery runs.
+
+Module: Google Drive + Docs
+Status: BUILT
+Description: Google Drive folder navigation. Create, open, delete, export documents. AI can read docs as RAG context source. Records tab integration.
+Full Summary: Working in GrimVeil. Folder browser, doc viewer, create new doc, export to PDF. AI can be fed document content as context for answering questions. Forms the Records tab in the spell book.
+
+Module: Gmail Integration
+Status: PLANNED
+Description: Inbox panel inside the deck. View sender, subject, snippet. AI can summarize, flag, and draft replies. Send requires explicit opt-in scope.
+Full Summary: Uses existing Google OAuth. Adds gmail.readonly scope for view/summarize. gmail.send scope optional for drafting replies. Separate module from Calendar/Drive since email access is sensitive and not everyone wants it. Opt-in clearly labeled at install.
+
+── SECOND LIFE ──────────────────────────────────────────────────
+
+Module: SL Scans
+Status: BUILT
+Description: Second Life avatar scanner results manager. Parse raw scan text into item/creator pairs. Save with name, description, tags. View, modify, delete.
+Full Summary: Parses raw SL scan output. Pre-processes with regex to insert newlines before timestamps. Add/view/modify/delete entries. Known issues: delete button missing, modify broken, single-line paste split incorrect — flagged for rebuild from spec.
+
+Module: SL Commands
+Status: BUILT
+Description: Reference table for Second Life commands. Command plus description. Add, modify, delete entries. Copy command to clipboard.
+Full Summary: Simple reference table. Full CRUD. Clipboard copy per command. Working correctly.
+
+Module: SL Vault
+Status: PLANNED
+Description: Encrypted local password manager for Second Life bot accounts and alts. Store credentials locally, never in cloud. Requires cryptography pip package.
+Full Summary: Local only. Encrypted storage using cryptography package. Fields: account name, username, password, notes. No cloud sync ever. For managing multiple SL bot accounts and alt credentials securely.
+
+── CAREER ───────────────────────────────────────────────────────
+
+Module: Job Tracker
+Status: BUILT
+Description: Application tracking with company, title, date, link, status, notes. Multi-select hide/unhide/delete. CSV and TSV export. Archive and restore.
+Full Summary: Fields: Company, Title, Date Applied, Link, Status (dropdown), Hidden flag, Completed Date, Notes. Multi-select operations. CSV/TSV export. Archive flow. Current Codex implementation has quality issues — flagged for rebuild from spec.
+
+── KNOWLEDGE ────────────────────────────────────────────────────
+
+Module: Lessons Learned
+Status: PARTIAL
+Description: Code lessons database with LSL Forbidden Ruleset. Search by language and environment. Structure exists, UI needs completion.
+Full Summary: Stores coding lessons, gotchas, and rules per language/environment (LSL, Python, PySide6, JavaScript, others). LSL Forbidden Ruleset built in. Search and filter by language and environment tags. Structure present, full UI not yet complete.
+
+Module: Sticky Notes
+Status: PARTIAL
+Description: Quick notes with title, content, color tag, timestamp, pin. Hide/archive, hard delete with confirmation, export to TXT or CSV. Pinned notes stay at top.
+Full Summary: Color-tagged notes. Pin to top. Hide without deleting. Hard delete requires confirmation. Export individual or all. Goes in Tools tab or as sidebar widget. Structure partially built.
+
+── KITCHEN ──────────────────────────────────────────────────────
+
+Module: Cookbook
+Status: PLANNED
+Description: Recipe parser via paste or URL fetch. Cook Mode with user-paced steps. Serving scaler. Ratings. AI gather from conversation. Nutritional tracking optional.
+Full Summary: Parser handles paste text and URL fetch+strip. Parses into title, description, servings, ingredients with amounts, steps in chunks, tips, storage notes. Serving scaler recalculates proportionally. Cook Mode: AI narrates in character, user advances with Done button or ready signal, never auto-advances. Ratings 1-5 stars. AI proactively offers to store recipe-shaped conversations. Gather button captures AI-generated recipes. Google Calendar integration for scheduling meals. Nutritional data: USDA FoodData API lookup with user override. Export to TXT. Bundleable with Shopping List and Meal Planner as Kitchen Suite.
+
+Module: Shopping List
+Status: PLANNED
+Description: Generate from recipe or meal plan. Staple detection with In Stock toggle. Ingredient intelligence cross-references pantry against new recipes. Export to CSV, TXT, clipboard.
+Full Summary: Generate list from single recipe or full meal plan week. Combine duplicate ingredients, sum quantities. Staple detection: items appearing in 5+ recipes or 3+ consecutive lists become Staple candidates, user confirms. In Stock toggle per staple. Ingredient intelligence: cross-reference any new recipe against current staples and in-stock items, shows what you already have. Export CSV/TXT/clipboard. Google Calendar integration creates Grocery Run task with list in description. SMS via clipboard copy, not Twilio, to avoid account dependency.
+
+Module: Meal Planner
+Status: PLANNED
+Description: Weekly and monthly calendar view. Assign stored recipes to days. Nutritional totals per day and week. Pattern detection with taco-adjacent recipe suggestions.
+Full Summary: Calendar view weekly and monthly. Drag or assign recipes from Cookbook to days. Tracks per-day nutritional totals for user-selected metrics: calories, carbs, sugar, protein, fat, sodium. Running totals per day and week, no judgment. Pattern detection: if tacos appear frequently, system cross-references taco ingredients against other recipes and suggests variations using same staples. Quick-assign from favorites. 5-star filter for high-rated meals. Integration with Shopping List to auto-generate grocery list from the week's plan.
+
+── PROFESSIONAL ─────────────────────────────────────────────────
+
+Module: Project Manager
+Status: PLANNED
+Description: Multi-project management with goals, milestones, phases, risk register, stakeholder plan, communication plan, and change management plan.
+Full Summary: Multiple concurrent projects. Per project: Name, Start/End Date, Description, Budget (yes/no with cost breakdown +/-), Scope, Status (Red/Yellow/Green), Goals with sub-items each having status and date, Milestones and Deliverables same structure, Phases with tiers and sub-tiers, Risk Management Plan, SMP (Stakeholder Management Plan with name/email/phone/timezone/company/title), Communication Plan notefield, CMP (Change Management Plan notefield). All items exportable to CSV. Measurable criteria tracked. KPI dashboard with customizable metrics.
+
+Module: CSM Workspace
+Status: PLANNED
+Description: Customer Success Manager workspace. Account management, health scores, renewal tracking, QBR logging. KPI dashboard. AI-drafted status reports to Google Docs.
+Full Summary: Built on same data model as Project Manager but oriented around customer accounts. Fields: Company, Primary Contact, Contract Value, Renewal Date, Health Score (Red/Yellow/Green), CSM Owner, Onboarding Status, Support Tier. Per account: Goals, Milestones, Risk flags, Stakeholder contacts, Communication log, QBR tracker. KPI dashboard: renewal rate, at-risk accounts, onboarding completion, average health score. Google Calendar sync for renewal dates and QBRs. Google Drive for account documents as RAG context. Export CSV or AI-drafted report to Google Docs.
+
+Module: Bill Scheduler + Budget
+Status: PLANNED
+Description: Bill tracking with due dates, amounts, and APScheduler reminders. Budget categories and totals. No bank integration. Export to CSV.
+Full Summary: Bill entries with name, amount, due date, recurrence, paid/unpaid status. APScheduler fires reminders before due dates. Budget categories with monthly totals. Income vs expense tracking. Running balance. No bank or financial API integration — all manual entry. Export to CSV. Standalone or bundled with Professional pack.
+
+Module: KPI Dashboard
+Status: PLANNED
+Description: Customizable KPI tracking with user-defined metrics, thresholds, and color-coded status. Python math, AI generates language layer for reports.
+Full Summary: User defines KPI metrics with name, target value, current value, threshold colors (red/yellow/green). Python calculates percentage, trend direction, days to target. Visual gauge or bar per metric. AI generates written status summary on demand. Export to CSV or AI-drafted report. Discussed as component of Project Manager and CSM Workspace but also viable standalone.
+
+Module: Business Planner
+Status: PLANNED
+Description: Universal business model tracker. Revenue streams, expense categories, profit/loss over time, client tracking, invoice and quote generation, growth projections.
+Full Summary: Revenue stream tracking by category and date. Expense tracking by category. Profit/loss calculation over configurable time periods. Client/customer database with contact info and transaction history. Invoice and quote generation with export. Business growth projections based on historical data. Exportable reports. Foundation layer that Escape Room Business Manager sits on top of. Robert uses for deck business.
+
+── EDUCATION ────────────────────────────────────────────────────
+
+Module: Teacher Toolkit
+Status: PLANNED
+Description: Class roster with attendance, CRISPE prompt builder, Fun-5/Serious-6/Double-Time quick buttons, quiz generator, rubric builder. Public, substitute, and homeschool editions.
+Full Summary: Three editions: Public School (full roster, attendance, accommodations), Substitute (lighter, no persistent roster needed), Homeschool (single student deep tracking). Class Manager: student roster per class/year, name, grade, notes (accommodations, engagement), attendance per session, multi-class support, CSV import. CRISPE Prompt Builder: structured form maps to Context/Role/Information/Steps/Personality/Example, Python constructs full prompt, AI never gets vague request. Quick Buttons: Fun-5 (5 fun age-appropriate activities), Serious-6 (6 rigorous standards-aligned activities), Double-Time (2-day lesson plan with assessment). Pop Quiz Generator: topic, grade, question count, difficulty, question types, Python builds prompt, AI generates, export TXT/PDF. Rubric Builder: assignment type, grade, criteria count, point scale, AI generates, editable, export CSV/TXT. Scheduling via existing Calendar module. Student data stored locally only — FERPA-safe by design.
+
+── GAMING / TTRPG ───────────────────────────────────────────────
+
+Module: Dice Roller
+Status: PLANNED
+Description: Full polyhedral set d4 through d100. Saved and auto-detected common rolls. AI-assisted custom rule creation via conversation. Results list with modifier and total columns.
+Full Summary: Quantity input plus die type selector (d4/d6/d8/d10/d12/d20/d100). Roll button. Results list: individual roll, modifier column, total column, grand total pinned at bottom, scrollable. Procedurally generated roll sound. Saved rolls: user creates named presets with die type, quantity, modifier. Auto-frequency tracking: detects commonly used rolls and suggests saving them. Built-in rule sets: 4d6 drop lowest, 3d6 classic, heroic method, standard array, point buy. AI-assisted custom logic: Add Custom Logic button puts module in listen mode, user describes rule to AI conversationally, AI works out math, Finalize button sends structured prompt asking AI to express rule in parseable format, module captures response, stores as executable logic, appears in saved rolls. Advantage/disadvantage (roll 2d20 take higher/lower). Critical detection (nat 20 highlighted). Persona-flavored commentary on results.
+
+Module: Character Sheet
+Status: PLANNED
+Description: D&D 3/3.5/4/5e and Pathfinder character sheets. Stat entry with derived value calculation. Weapon and spell tracking. Ties into Dice Roller for auto-modifier pulls.
+Full Summary: System selector: D&D 3rd, 3.5, 4th, 5th edition, Pathfinder. Entry form for all stats, modifiers, skills, saving throws, HP, AC, speed. Derived value calculation (Python math, not AI). Weapon inventory with damage dice, bonus, damage type. Spell slots and spell list. When rolling damage in Dice Roller with character sheet loaded, auto-pulls STR/DEX/spell modifier and weapon bonus. Six ability score generation tied to Dice Roller rule sets.
+
+Module: Loot Tracker
+Status: PLANNED
+Description: Track found items during tabletop sessions. Fields for item name, quantity, value, recipient. Filter and export by session or campaign.
+Full Summary: Add items found during play. Fields: item name, type, quantity, gold value, who received it, session date, notes. Filter by session, campaign, or recipient. Running total value. Export to CSV. Integrates with Session Journal for automatic loot logging when AI narrator processes session notes.
+
+Module: Session Journal + AI Narrator
+Status: PLANNED
+Description: Freeform session log with AI narration. Send mechanical notes to AI for in-character story conversion. Dice roll results translate into narrative prose.
+Full Summary: Freeform text log during play. Entries timestamped. Send individual entries or full session to AI. AI uses persona layer plus character sheet context plus dice results to convert mechanical notes into in-character narrative. Example: "rolled 13 plus 6 modifier, hit, 12 damage" becomes "I looked the Gnoll in its eyes, screaming out to my Warrior goddess as I swung my broadsword. I struck, hitting the beast. The flesh cleaved from its body as it recoiled." Export narrative to TXT or Google Docs. Campaign memory: AI accumulates session context over time for consistent narrative voice.
+
+── TOOLS ────────────────────────────────────────────────────────
+
+Module: Claim vs Reality Engine
+Status: BUILT
+Description: Sovereign Citizen, Flat Earth, and conspiracy claim debunking. Three modes: Balanced, Dry Legal, Extra Parody. Copy functions. Content packs sold separately.
+Full Summary: Base engine with SovCit pack included. Content packs: Flat Earth, General Conspiracy sold separately. Three output modes: Balanced (factual neutral), Dry Legal (case citations, statutory language), Extra Parody (darkly humorous). Copy individual response or full exchange. Standalone product also sold separately outside deck ecosystem.
+
+Module: Magic 8-Ball
+Status: PLANNED
+Description: Classic 8-ball with persona-flavored responses. Shake animation. Each persona has unique response flavor matching their character voice.
+Full Summary: Classic 20-response set plus persona-flavored additions. Morganna: "The shadows suggest yes." / "Do not test fate twice." Seraphel: "The lore supports this path." GrimVeil: "Statistically probable. E-42 concurs." ARIA-7: "Probability threshold exceeded. Affirmative." Zyx-Noor: "The collective has observed this outcome." Shake animation on roll. Response displayed with persona-appropriate styling.
+
+Module: Celestial + Holiday
+Status: PLANNED
+Description: Moon phase, sunrise/sunset, eclipse predictions via Meeus algorithm, major astronomical events, holiday tracker, 5 O'Clock Somewhere, Santa tracker seasonal.
+Full Summary: Moon phase calculated via corrected Meeus math. Sunrise/sunset via wttr.in lookup. Eclipse predictions: solar and lunar, date, type (total/partial/annular), visibility region, pure math no API. Major astronomical events calendar. Holiday tracker: user-configurable country/region, days until next holiday, persona-flavored announcements. 5 O'Clock Somewhere: checks all major timezones, finds where it is between 17:00-18:00, displays with persona flavor. Santa tracker: active December 1-25 only, days until Christmas the rest of the year. Persona-colored: Morganna tracks moon for vampire reasons, Ur-Nanna tracks Sumerian calendar events, ARIA-7 reports astronomically.
+
+Module: Session Browser
+Status: PARTIAL
+Description: Browse past sessions by date. AI-generated session naming. Group and label sessions. Search by content. Export individual or bulk.
+Full Summary: Browse all past sessions in chronological or reverse-chronological order. AI-generated session name based on conversation summary. Manual rename. Group by label or campaign. Full-text search across sessions. Export individual session as TXT or push to Google Docs. Bulk export. Structure partially built.
+
+Module: System Monitor Extended
+Status: PARTIAL
+Description: Extended system monitoring beyond base gauges. Full RAM breakdown, per-drive storage, network spike detection, paged pool, process list.
+Full Summary: Extends base CPU/RAM/GPU/VRAM instruments panel. Full RAM breakdown: physical, virtual, paged pool, standby. Per-drive storage bars for all mounted drives. Network spike detection with alert threshold. Top process list by CPU and RAM. GPU temperature and clock speed if available via pynvml. Structure partially built.
+
+── CREATIVE / PRODUCTIVITY ──────────────────────────────────────
+
+Module: MindMap
+Status: PLANNED
+Description: Hierarchical node mindmap with file cabinet interface. Physics-weighted connections, snap-to-grid, theme skins, auto-save, multi-format export.
+Full Summary: Existing standalone tool to port into deck module system. Three-drawer file cabinet as root. Hierarchical nodes tiers 1-5. Right-click existing node to create child. Click cabinet to create new primary node. Drag and drop node onto another to re-parent and snap as child. All nodes connected back to open cabinet drawer, link point at top of drawer. Physics-weighted connections that stretch with distance. Theme skins: Halloween mode has spider web connections that move as if in breeze. Auto-save with configurable interval (15/30/45/60 minutes). 5-backup JSON rotation. Multi-format export: CSV, PDF, DOCX, XLSX. Search with metadata filtering. Node metadata includes timestamp, type, source, tags, emotion, linked IDs.
+
+Module: Book Reader
+Status: PLANNED
+Description: PDF and epub display panel. Flips chat window to reading mode. AI available as reading companion in side panel for questions about current content.
+Full Summary: Load PDF or epub files. Chat window flips to reading display panel with page navigation and scroll. Bookmark system. AI side panel stays active for questions about what is being read. AI can summarize chapters, answer questions about content, define terms in context. Designed initially for Robert's roommate who reads via Kindle/Amazon. Mac port consideration since roommate is Mac-only.
+
+── SPECIALTY / COMMERCIAL ───────────────────────────────────────
+
+Module: Escape Room Business Manager
+Status: PLANNED
+Description: Event scheduling, attendee tracking, revenue and cost tracking, mileage log, staff management, theme and room inventory. Scales from single room to theme park.
+Full Summary: Event scheduling with calendar: where, when, which rooms. Attendee and participant count per event. Revenue per event. Cost tracking: mileage, fuel, setup time, staff hours, staff costs, supplies, venue fees. Theme management: which escape rooms owned, setup time, capacity, condition, maintenance log. Venue types: carnival, theme park, parking lot, private event, permanent location. Mileage log for tax purposes. Staff scheduling and cost calculation. Reports: profit/loss per event, per theme, per venue type, per time period. Scaling model from 1 room to multi-room to theme park presence. Built on top of Business Planner module foundation.
+
+Module: Business Planner
+Status: PLANNED
+Description: Universal business model tracker. Revenue streams, expenses, profit/loss, client tracking, invoices, quotes, growth projections. Foundation for Escape Room and other vertical modules.
+Full Summary: Revenue stream tracking by category and date. Expense tracking by category. Profit/loss over configurable periods. Client/customer database with contact info and transaction history. Invoice and quote generation with export. Business growth projections from historical data. Exportable reports. Robert uses this for the deck business itself. Foundation layer other specialty modules extend.
+
+── SYSTEM ───────────────────────────────────────────────────────
+
+Module: Module Manager
+Status: PLANNED
+Description: Install, disable, reset, and remove modules from a settings table. Welcome screen on first load per module. Re-trigger help from settings. Hot-load or self-restart after install.
+Full Summary: Settings panel table with columns: Module Name, Version, Status, Disable/Enable, Reset, Remove. Fixed-width action columns regardless of name length. Status indicator: active, disabled, error, outdated, missing dependencies. On first install: new module tab gets focus, welcome screen renders with module name, version, what it does, instructions, Don't Show Again checkbox, Get Started button. Help button re-triggers welcome screen. Disable: tab disappears, module stays installed, data preserved, re-enable restores without reinstall. Reset: wipes module data to defaults, confirmation required. Remove: full uninstall, confirmation required, restart if hot-unload not possible. Install path: drop .edm file into deck root folder, deck detects on launch or via drag-and-drop onto UI, runs install flow, hot-loads or self-restarts after confirmed clean install. Executable installer for commercial distribution: asks for deck folder location, validates it is a deck, unpacks .edm, signals deck to refresh, exits.
+
+════════════════════════════════════════════════════════════════
+TOTAL: 28 modules across 10 categories
+Built: 6 | Partial: 4 | Planned: 18
+════════════════════════════════════════════════════════════════
