@@ -173,6 +173,7 @@ class OllamaClient:
             self._dispatcher.on_provider_response("local", response, message_id)
             return
 
+        self._derive_topic_keywords(content)
         response = self.generate(content)
         if self.observer_mode == "command":
             response = "[COMMAND MODE] " + response
@@ -184,6 +185,26 @@ class OllamaClient:
         self._dispatcher.on_provider_response("local", response, message_id)
 
         self._scan_and_write_lesson()
+
+    def _derive_topic_keywords(self, content: str):
+        text = (content or "").strip()
+        if not text:
+            self._current_topic = ""
+            self._current_keywords = ""
+            return
+        topic = text.splitlines()[0][:80].strip()
+        words = [w.strip(".,:;!?()[]{}\"'").lower() for w in text.split()]
+        words = [w for w in words if len(w) >= 4]
+        deduped = []
+        seen = set()
+        for w in words:
+            if w not in seen:
+                deduped.append(w)
+                seen.add(w)
+            if len(deduped) >= 8:
+                break
+        self._current_topic = topic
+        self._current_keywords = ",".join(deduped)
 
     def _scan_and_write_lesson(self):
         if self._current_key_id is None:

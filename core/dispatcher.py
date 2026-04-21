@@ -10,7 +10,6 @@ class Dispatcher(QObject):
     response_signal = pyqtSignal(str, str)       # (ai_name, content)
     user_message_signal = pyqtSignal(str, str)   # (ai_name, content)
     chunk_signal = pyqtSignal(str, str)          # (ai_name, chunk_text)
-    scroll_to_bottom_signal = pyqtSignal(str)    # (ai_name)
 
     def __init__(self, db_client=None, parent=None):
         super().__init__(parent)
@@ -28,6 +27,7 @@ class Dispatcher(QObject):
         self._round_prompt = ""
         self._round_role = "user"
         self._round_responses: Dict[str, str | None] = {}
+        self._round_expected = set()
         self._round_timed_out = set()
         self._round_finalized = False
 
@@ -60,18 +60,21 @@ class Dispatcher(QObject):
             if ai_name in targets and ai_name in self.providers and ColumnManager.instance().is_active(ai_name):
                 active_targets.append(ai_name)
 
-        for ai_name in active_targets:
-            self.scroll_to_bottom_signal.emit(ai_name)
-
         self._round_active = True
         self._round_prompt = content
         self._round_role = role
+        self._round_expected = {
+            ai_name for ai_name in ["claude", "chatgpt", "grok", "copilot"] if ai_name in active_targets
+        }
         self._round_responses = {
             "claude": None,
             "chatgpt": None,
             "grok": None,
             "copilot": None,
         }
+        for ai_name in ["claude", "chatgpt", "grok", "copilot"]:
+            if ai_name not in self._round_expected:
+                self._round_responses[ai_name] = ""
         self._round_timed_out = set()
         self._round_finalized = False
 
@@ -111,6 +114,10 @@ class Dispatcher(QObject):
 
             QTimer.singleShot(delay_ms, _invoke_provider)
             delay_ms += step_ms
+
+        if not fired:
+            self._finalize_round()
+            return
 
         def _start_timeouts(names=fired):
             for ai_name in names:
@@ -180,7 +187,7 @@ class Dispatcher(QObject):
             self._finalize_round()
 
     def _try_finalize_round(self):
-        if all(self._round_responses.get(k) is not None for k in ["claude", "chatgpt", "grok", "copilot"]):
+        if all(self._round_responses.get(k) is not None for k in self._round_expected):
             self._finalize_round()
 
     def _finalize_round(self):
