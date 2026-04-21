@@ -22,7 +22,7 @@ class LocalEyeIndicator(QWidget):
 
         self.setFixedSize(64, 64)
         self._opacity = 1.0
-        self._observer_mode = True
+        self._mode = "observer"
 
         # Load images or fallback
         self.eye_open = self._load_image("assets/eye_open.png")
@@ -41,8 +41,7 @@ class LocalEyeIndicator(QWidget):
         # Theme updates
         AppState.instance().theme_changed.connect(self.update)
 
-        # Start in observer mode
-        self.set_observer_mode(True)
+        self.set_mode("observer")
 
     # ---------------------------------------------------------
     # IMAGE LOADING
@@ -70,16 +69,22 @@ class LocalEyeIndicator(QWidget):
     # MODE SWITCH
     # ---------------------------------------------------------
 
-    def set_observer_mode(self, enabled: bool):
-        """True = open eye + pulse, False = closed eye + static."""
-        self._observer_mode = enabled
+    def set_mode(self, mode: str):
+        if mode not in ("observer", "participate", "command"):
+            return
 
-        if enabled:
+        self._mode = mode
+
+        if mode == "observer":
+            self.anim.setDuration(2000)
             self.anim.start()
-        else:
+        elif mode == "participate":
             self.anim.stop()
             self._opacity = 1.0
             self.update()
+        elif mode == "command":
+            self.anim.setDuration(600)
+            self.anim.start()
 
     # ---------------------------------------------------------
     # PAINT EVENT
@@ -91,16 +96,21 @@ class LocalEyeIndicator(QWidget):
 
         painter.setOpacity(self._opacity)
 
-        if self._observer_mode:
+        if self._mode == "observer":
             if self.eye_open:
                 painter.drawPixmap(0, 0, 64, 64, self.eye_open)
             else:
                 self._draw_placeholder(painter, QColor("#00F6FF"))
-        else:
+        elif self._mode == "participate":
             if self.eye_closed:
                 painter.drawPixmap(0, 0, 64, 64, self.eye_closed)
             else:
                 self._draw_placeholder(painter, QColor("#555555"))
+        elif self._mode == "command":
+            if self.eye_open:
+                painter.drawPixmap(0, 0, 64, 64, self.eye_open)
+            else:
+                self._draw_placeholder(painter, QColor("#FF4500"))
 
     # ---------------------------------------------------------
     # PLACEHOLDER DRAWING

@@ -166,6 +166,9 @@ class DeckHUD(QMainWindow):
         self.local_provider = OllamaClient()
         self.local_provider.set_model(local_model or "dolphin-mistral")
 
+        self.local_top.mode_changed.connect(self.local_provider.set_mode)
+        self.local_provider.start_background_watcher()
+
         self.claude_provider.bind(self.dispatcher)
         self.chatgpt_provider.bind(self.dispatcher)
         self.grok_provider.bind(self.dispatcher)
