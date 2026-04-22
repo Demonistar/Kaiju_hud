@@ -47,6 +47,7 @@ class OllamaClient:
         self._current_topic = ""
         self._current_keywords = ""
         self._watcher_seen = {}
+        self._last_status_message = None
 
         self._load_cached_location()
         self._detect_ollama()
@@ -158,6 +159,15 @@ class OllamaClient:
     def bind(self, dispatcher):
         self._dispatcher = dispatcher
 
+    def _emit_status(self, status: str):
+        """Emit lightweight local-only UI status without touching persistence."""
+        message = status.strip()
+        if not message or message == self._last_status_message:
+            return
+        self._last_status_message = message
+        if self._dispatcher is not None:
+            self._dispatcher.response_signal.emit("local", message)
+
     # ---------------------------------------------------------
     # PROVIDER HANDLER
     # ---------------------------------------------------------
@@ -174,11 +184,13 @@ class OllamaClient:
             return
 
         self._derive_topic_keywords(content)
+        self._emit_status("[Thinking] Generating response")
         response = self.generate(content)
         if self.observer_mode == "command":
             response = "[COMMAND MODE] " + response
 
         if self._current_key_id is not None:
+            self._emit_status("[Cataloging] Saving response")
             self._db.update_response(self._current_key_id, "bobby_response", response)
 
         message_id = f"local-{self._dispatcher._now_ms()}"
@@ -192,6 +204,7 @@ class OllamaClient:
             self._current_topic = ""
             self._current_keywords = ""
             return
+        self._emit_status("[Filing] Parsing keywords")
         topic = text.splitlines()[0][:80].strip()
         words = [w.strip(".,:;!?()[]{}\"'").lower() for w in text.split()]
         words = [w for w in words if len(w) >= 4]
@@ -210,6 +223,7 @@ class OllamaClient:
         if self._current_key_id is None:
             return
 
+        self._emit_status("[Reading] Querying lessons")
         recent = self._db.get_recent_lessons(self._current_topic, self._current_keywords)
         current = self._db.get_row(self._current_key_id)
         response = (current.get("bobby_response") or "").strip()
@@ -230,6 +244,7 @@ class OllamaClient:
         else:
             lesson = f"[KNOWN: key_id={matching.get('key_id')}] Similar lesson seen before."
 
+        self._emit_status("[Cataloging] Updating lesson")
         self._db.update_response(self._current_key_id, "bobby_lesson", lesson)
 
     def start_background_watcher(self):
@@ -269,6 +284,7 @@ class OllamaClient:
                                 elapsed = f"{elapsed_sec}s"
                             except Exception:
                                 pass
+                            self._emit_status("[Notes] Capturing AI response")
                             notice = (
                                 f"[NOTICE] {ai_map[col]} responded to \"{prompt}\" — "
                                 f"{elapsed}: {resp_snippet}"
