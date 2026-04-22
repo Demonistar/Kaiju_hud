@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import (
 
 from core.glow_manager import GlowManager
 from core.app_state import AppState
+from core.settings_manager import SettingsManager
+from ui.prompt.hidden_prompt_manager import HiddenPromptManagerDialog
 
 
 class PromptBar(QWidget):
@@ -24,6 +26,11 @@ class PromptBar(QWidget):
         self.dispatcher = dispatcher
         self.targets = []
         self._resizing = False  # <-- prevents recursive resize loops
+
+        self._settings = SettingsManager()
+        self._hidden_prompt_dialog = None
+        self._hidden_prompt_enabled = self._settings.get_hidden_prompt_enabled()
+        self._hidden_prompt_profile = self._settings.get_hidden_prompt_profile()
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(140)
@@ -50,10 +57,20 @@ class PromptBar(QWidget):
         GlowManager().register_widget(self.send_btn, intensity="medium")
 
         # -----------------------------------------------------
+        # HIDDEN PROMPT BUTTON
+        # -----------------------------------------------------
+        self.hidden_prompt_btn = QPushButton()
+        self.hidden_prompt_btn.setFixedHeight(self.send_btn.height())
+        self.hidden_prompt_btn.clicked.connect(self._open_hidden_prompt_manager)
+        GlowManager().register_widget(self.hidden_prompt_btn, intensity="medium")
+        self._refresh_hidden_prompt_button()
+
+        # -----------------------------------------------------
         # LAYOUT
         # -----------------------------------------------------
         row = QHBoxLayout()
         row.addStretch()
+        row.addWidget(self.hidden_prompt_btn)
         row.addWidget(self.send_btn)
 
         layout = QVBoxLayout()
@@ -108,6 +125,37 @@ class PromptBar(QWidget):
         return super().eventFilter(obj, event)
 
     # ---------------------------------------------------------
+    # HIDDEN PROMPT MANAGER
+    # ---------------------------------------------------------
+
+    def _open_hidden_prompt_manager(self):
+        if self._hidden_prompt_dialog is None:
+            self._hidden_prompt_dialog = HiddenPromptManagerDialog(self)
+            self._hidden_prompt_dialog.settings_changed.connect(self._on_hidden_prompt_settings_changed)
+
+        self._hidden_prompt_dialog.refresh_from_storage()
+        self._hidden_prompt_dialog.show()
+        self._hidden_prompt_dialog.raise_()
+        self._hidden_prompt_dialog.activateWindow()
+
+    def _on_hidden_prompt_settings_changed(self, enabled: bool, profile: str):
+        self._hidden_prompt_enabled = enabled
+        self._hidden_prompt_profile = profile
+        self._refresh_hidden_prompt_button()
+
+    def _refresh_hidden_prompt_button(self):
+        profile_name = (self._hidden_prompt_profile or "None").strip() or "None"
+        on_off = "ON" if self._hidden_prompt_enabled else "OFF"
+        self.hidden_prompt_btn.setText(f"Hidden: {on_off} : {profile_name}")
+
+        if self._hidden_prompt_enabled:
+            self.hidden_prompt_btn.setStyleSheet(
+                "QPushButton { background-color: #1f7a3f; color: white; font-weight: 600; padding: 0 14px; }"
+            )
+        else:
+            self.hidden_prompt_btn.setStyleSheet("")
+
+    # ---------------------------------------------------------
     # SEND HANDLER
     # ---------------------------------------------------------
 
@@ -118,10 +166,23 @@ class PromptBar(QWidget):
 
         self._play_roar()
 
-        self.dispatcher.send_message(self.targets, content)
+        self._hidden_prompt_enabled = self._settings.get_hidden_prompt_enabled()
+        self._hidden_prompt_profile = self._settings.get_hidden_prompt_profile()
+        hidden_suffix = self._settings.get_hidden_prompt_text(self._hidden_prompt_profile)
+
+        provider_content = content
+        if self._hidden_prompt_enabled and hidden_suffix.strip():
+            provider_content = f"{content}\n\n{hidden_suffix.strip()}"
+
+        self.dispatcher.send_message(
+            self.targets,
+            display_content=content,
+            provider_content=provider_content,
+        )
         self.message_sent.emit(self.targets, content)
 
         self.text_edit.clear()
+        self._refresh_hidden_prompt_button()
 
     # ---------------------------------------------------------
     # ROAR SOUND

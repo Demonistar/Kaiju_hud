@@ -1,5 +1,3 @@
-# core/settings_manager.py
-
 import os
 import json
 
@@ -16,9 +14,12 @@ class SettingsManager:
       - last_glow
       - last_window_mode
       - columns (visibility dict)
+      - hidden_prompt_enabled
+      - hidden_prompt_profile
     """
 
     SETTINGS_PATH = os.path.join("config", "settings.json")
+    HIDDEN_PROMPTS_PATH = os.path.join("config", "hidden_prompt_profiles.json")
 
     def __init__(self):
         self.settings = {
@@ -36,7 +37,9 @@ class SettingsManager:
                 "grok": True,
                 "copilot": True,
                 "local": True
-            }
+            },
+            "hidden_prompt_enabled": False,
+            "hidden_prompt_profile": ""
         }
 
         self._load()
@@ -117,3 +120,52 @@ class SettingsManager:
     def set_columns(self, columns: dict):
         self.settings["columns"] = columns.copy()
         self.save()
+
+    def get_hidden_prompt_enabled(self) -> bool:
+        return bool(self.settings.get("hidden_prompt_enabled", False))
+
+    def set_hidden_prompt_enabled(self, enabled: bool):
+        self.settings["hidden_prompt_enabled"] = bool(enabled)
+        self.save()
+
+    def get_hidden_prompt_profile(self) -> str:
+        return str(self.settings.get("hidden_prompt_profile", "") or "")
+
+    def set_hidden_prompt_profile(self, profile_name: str):
+        self.settings["hidden_prompt_profile"] = str(profile_name or "")
+        self.save()
+
+    def get_hidden_prompt_profiles(self) -> dict:
+        data = self._load_hidden_prompts()
+        profiles = data.get("profiles", {})
+        if isinstance(profiles, dict):
+            return {str(k): str(v) for k, v in profiles.items()}
+        return {}
+
+    def save_hidden_prompt_profiles(self, profiles: dict):
+        clean_profiles = {str(k): str(v) for k, v in profiles.items()}
+        payload = {"profiles": clean_profiles}
+        try:
+            os.makedirs("config", exist_ok=True)
+            with open(self.HIDDEN_PROMPTS_PATH, "w") as f:
+                json.dump(payload, f, indent=4)
+        except Exception:
+            pass
+
+    def get_hidden_prompt_text(self, profile_name: str) -> str:
+        if not profile_name:
+            return ""
+        profiles = self.get_hidden_prompt_profiles()
+        return profiles.get(profile_name, "")
+
+    def _load_hidden_prompts(self) -> dict:
+        if not os.path.exists(self.HIDDEN_PROMPTS_PATH):
+            return {"profiles": {}}
+        try:
+            with open(self.HIDDEN_PROMPTS_PATH, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+        return {"profiles": {}}

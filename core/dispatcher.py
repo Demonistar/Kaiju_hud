@@ -37,7 +37,7 @@ class Dispatcher(QObject):
         """Register a provider handler."""
         self.providers[ai_name] = handler
 
-    def send_message(self, targets: List[str], content: str, role: str = "user"):
+    def send_message(self, targets: List[str], display_content: str, provider_content: str | None = None, role: str = "user"):
         """
         Core entry point for sending messages to providers.
         Implements:
@@ -47,6 +47,9 @@ class Dispatcher(QObject):
         """
         if not targets:
             return
+
+        if provider_content is None:
+            provider_content = display_content
 
         # Expand 'all'
         if "all" in targets:
@@ -61,7 +64,7 @@ class Dispatcher(QObject):
                 active_targets.append(ai_name)
 
         self._round_active = True
-        self._round_prompt = content
+        self._round_prompt = display_content
         self._round_role = role
         self._round_expected = {
             ai_name for ai_name in ["claude", "chatgpt", "grok", "copilot"] if ai_name in active_targets
@@ -83,11 +86,11 @@ class Dispatcher(QObject):
             local_provider = local_handler.__self__
             if hasattr(local_provider, "_db"):
                 session_id = str(self._now_ms())
-                key_id = local_provider._db.open_round(session_id, content, active_targets)
+                key_id = local_provider._db.open_round(session_id, display_content, active_targets)
                 local_provider._current_key_id = key_id
 
         if role == "user" and "local" in active_targets:
-            self.user_message_signal.emit("local", content)
+            self.user_message_signal.emit("local", display_content)
 
         delay_ms = 0
         step_ms = 1500
@@ -107,10 +110,12 @@ class Dispatcher(QObject):
             now_ms = self._now_ms()
             self._pending[message_id] = now_ms
 
-            self._log_outbound(ai_name, content, role, message_id, now_ms)
-            self.user_message_signal.emit(ai_name, content)
+            outbound_content = provider_content if ai_name in ["claude", "chatgpt", "grok", "copilot"] else display_content
 
-            def _invoke_provider(name=ai_name, msg=content, r=role):
+            self._log_outbound(ai_name, outbound_content, role, message_id, now_ms)
+            self.user_message_signal.emit(ai_name, display_content)
+
+            def _invoke_provider(name=ai_name, msg=outbound_content, r=role):
                 handler_ref = self.providers.get(name)
                 if handler_ref:
                     handler_ref(msg, r)
