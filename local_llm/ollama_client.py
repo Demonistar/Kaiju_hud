@@ -48,6 +48,7 @@ class OllamaClient:
         self._current_topic = ""
         self._current_keywords = ""
         self._watcher_seen = {}
+        self._watcher_last_seen_key_id = 0
         self._last_status_message = None
 
         self._load_cached_location()
@@ -185,25 +186,36 @@ class OllamaClient:
         Provider entry point called by dispatcher.
         Handles observer mode and normal generation.
         """
+        is_synthesis_round = role == "synthesis"
+
         if self.observer_mode == "observer":
             response = "[Absorbed]"
             message_id = f"local-{self._dispatcher._now_ms()}"
             self._dispatcher.on_provider_response("local", response, message_id)
             return
 
-        synthesis_context = self._filter_synthesis_context(content)
-        if not synthesis_context:
-            self._emit_status("[Idle] No provider response context to synthesize")
-            return
+        if is_synthesis_round:
+            synthesis_context = self._filter_synthesis_context(content)
+            if not synthesis_context:
+                self._emit_status("[Idle] No provider response context to synthesize")
+                return
+            generation_prompt = self._build_finalizer_prompt(synthesis_context)
+            topic_source = synthesis_context
+        else:
+            direct_prompt = (content or "").strip()
+            if not direct_prompt:
+                return
+            generation_prompt = direct_prompt
+            topic_source = direct_prompt
 
-        self._derive_topic_keywords(synthesis_context)
+        self._derive_topic_keywords(topic_source)
         self._emit_status("[Thinking] Generating response")
-        response = self.generate(synthesis_context)
+        response = self.generate(generation_prompt)
         if self.observer_mode == "command":
             response = "[COMMAND MODE] " + response
 
         is_contaminated = self._is_instruction_contaminated(response)
-        if self._current_key_id is not None:
+        if self._current_key_id is not None and is_synthesis_round:
             if is_contaminated:
                 self._emit_status("[Cataloging] Skipped contaminated response persistence")
             else:
@@ -213,8 +225,20 @@ class OllamaClient:
         message_id = f"local-{self._dispatcher._now_ms()}"
         self._dispatcher.on_provider_response("local", response, message_id)
 
-        if not is_contaminated:
+        if is_synthesis_round and not is_contaminated:
             self._scan_and_write_lesson()
+
+    def _build_finalizer_prompt(self, synthesis_context: str) -> str:
+        rules = (
+            "SYNTHESIS RULES:\n"
+            "1) Identify the strongest consensus points first.\n"
+            "2) Identify substantive disagreements next.\n"
+            "3) Choose one implementation approach only after explaining why it is strongest.\n"
+            "4) Write an original synthesis; do not copy any single provider response verbatim.\n"
+            "5) Only produce a winner-takes-all answer if explicitly asked to pick a winner.\n\n"
+            "Provider responses to synthesize:\n"
+        )
+        return rules + synthesis_context
 
     def _derive_topic_keywords(self, content: str):
         text = (content or "").strip()
@@ -308,6 +332,7 @@ class OllamaClient:
     def start_background_watcher(self):
         if self._background_watcher_running:
             return
+        self._watcher_last_seen_key_id = self._db.get_max_key_id()
         self._background_watcher_running = True
 
         def _watcher():
@@ -327,6 +352,13 @@ class OllamaClient:
                 open_rows = self._db._get_open_rows()
                 for row in open_rows:
                     key_id = row.get("key_id")
+                    if key_id is None:
+                        continue
+                    if key_id <= self._watcher_last_seen_key_id:
+                        continue
+                    active_columns = (row.get("active_columns") or "").lower()
+                    if "local" in active_columns and all(row.get(col) is None for col in response_cols):
+                        continue
                     seen = self._watcher_seen.setdefault(key_id, {})
                     for col in response_cols:
                         prev = seen.get(col)
@@ -350,8 +382,11 @@ class OllamaClient:
                             if self._dispatcher is not None:
                                 message_id = f"local-{self._dispatcher._now_ms()}"
                                 self._dispatcher.on_provider_response("local", notice, message_id)
-                            self._db.update_late_response(key_id, "bobby_response", notice)
+                            if row.get("bobby_response") is None:
+                                self._db.update_late_response(key_id, "bobby_response", notice)
                         seen[col] = curr
+                    if key_id > self._watcher_last_seen_key_id:
+                        self._watcher_last_seen_key_id = key_id
                 time.sleep(30)
 
         thread = threading.Thread(target=_watcher, daemon=True)

@@ -30,6 +30,7 @@ class Dispatcher(QObject):
         self._round_expected = set()
         self._round_timed_out = set()
         self._round_finalized = False
+        self._round_synthesis_sent = False
 
     # ---------- PUBLIC API ----------
 
@@ -80,6 +81,7 @@ class Dispatcher(QObject):
                 self._round_responses[ai_name] = ""
         self._round_timed_out = set()
         self._round_finalized = False
+        self._round_synthesis_sent = False
 
         local_handler = self.providers.get("local")
         if local_handler is not None and hasattr(local_handler, "__self__"):
@@ -91,6 +93,17 @@ class Dispatcher(QObject):
 
         if role == "user" and "local" in active_targets:
             self.user_message_signal.emit("local", display_content)
+            local_message_id = self._make_message_id("local")
+            now_ms = self._now_ms()
+            self._pending[local_message_id] = now_ms
+            self._log_outbound("local", display_content, role, local_message_id, now_ms)
+
+            def _invoke_local_direct(msg=display_content, r=role):
+                handler_ref = self.providers.get("local")
+                if handler_ref:
+                    handler_ref(msg, r)
+
+            QTimer.singleShot(0, _invoke_local_direct)
 
         delay_ms = 0
         step_ms = 1500
@@ -227,8 +240,9 @@ class Dispatcher(QObject):
             if hasattr(local_provider, "should_synthesize_on_round_complete"):
                 should_trigger = bool(local_provider.should_synthesize_on_round_complete())
 
-        if local_handler and should_trigger and context_block.strip():
-            local_handler(context_block, self._round_role)
+        if local_handler and should_trigger and context_block.strip() and not self._round_synthesis_sent:
+            self._round_synthesis_sent = True
+            local_handler(context_block, "synthesis")
 
         self._round_active = False
 
