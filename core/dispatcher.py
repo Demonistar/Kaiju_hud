@@ -48,6 +48,9 @@ class Dispatcher(QObject):
         if not targets:
             return
 
+        if role == "user":
+            self._scroll_active_chat_panels_to_top()
+
         # Expand 'all'
         if "all" in targets:
             targets = list(self.providers.keys())
@@ -231,3 +234,15 @@ class Dispatcher(QObject):
         col = col_map.get(ai_name)
         if col:
             local_provider._db.update_response(key_id, col, content)
+
+    def _scroll_active_chat_panels_to_top(self):
+        cm = ColumnManager.instance()
+        widgets = getattr(cm, "_widgets", {})
+        for ai_name in cm.active_columns():
+            pair = widgets.get(ai_name)
+            if not pair or len(pair) < 2:
+                continue
+            bottom_widget = pair[1]
+            chat = getattr(bottom_widget, "chat", None)
+            if chat is not None and hasattr(chat, "verticalScrollBar"):
+                chat.verticalScrollBar().setValue(0)
