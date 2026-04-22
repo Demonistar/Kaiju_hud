@@ -167,13 +167,13 @@ class DeckHUD(QMainWindow):
         self.local_provider.set_model(local_model or "dolphin-mistral")
 
         self.local_top.mode_changed.connect(self.local_provider.set_mode)
-        self.local_provider.start_background_watcher()
 
         self.claude_provider.bind(self.dispatcher)
         self.chatgpt_provider.bind(self.dispatcher)
         self.grok_provider.bind(self.dispatcher)
         self.copilot_provider.bind(self.dispatcher)
         self.local_provider.bind(self.dispatcher)
+        self.local_provider.start_background_watcher()
 
         self.dispatcher.register_provider("claude", self.claude_provider.provider_handler)
         self.dispatcher.register_provider("chatgpt", self.chatgpt_provider.provider_handler)
