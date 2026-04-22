@@ -1,6 +1,6 @@
 # ui/widgets/local_eye_indicator.py
 
-import os
+from pathlib import Path
 from PyQt6.QtCore import Qt, QPropertyAnimation, pyqtProperty
 from PyQt6.QtGui import QPixmap, QPainter, QColor
 from PyQt6.QtWidgets import QWidget
@@ -25,8 +25,11 @@ class LocalEyeIndicator(QWidget):
         self._mode = "observer"
 
         # Load images or fallback
-        self.eye_open = self._load_image("assets/eye_open.png")
-        self.eye_closed = self._load_image("assets/eye_closed.png")
+        project_root = Path(__file__).resolve().parents[2]
+        assets_dir = project_root / "assets"
+        self.eye_open = self._load_image(assets_dir / "eye_open.jpg")
+        self.eye_closed = self._load_image(assets_dir / "eye_closed.jpg")
+        self.commander = self._load_image(assets_dir / "commander.png")
 
         # Animation
         self.anim = QPropertyAnimation(self, b"opacity")
@@ -47,9 +50,11 @@ class LocalEyeIndicator(QWidget):
     # IMAGE LOADING
     # ---------------------------------------------------------
 
-    def _load_image(self, path):
-        if os.path.exists(path):
-            return QPixmap(path)
+    def _load_image(self, path: Path):
+        if path.exists():
+            pixmap = QPixmap(str(path))
+            if not pixmap.isNull():
+                return pixmap
         return None  # triggers placeholder mode
 
     # ---------------------------------------------------------
@@ -107,8 +112,8 @@ class LocalEyeIndicator(QWidget):
             else:
                 self._draw_placeholder(painter, QColor("#555555"))
         elif self._mode == "command":
-            if self.eye_open:
-                painter.drawPixmap(0, 0, 64, 64, self.eye_open)
+            if self.commander:
+                painter.drawPixmap(0, 0, 64, 64, self.commander)
             else:
                 self._draw_placeholder(painter, QColor("#FF4500"))
 
