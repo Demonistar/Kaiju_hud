@@ -205,16 +205,24 @@ class Dispatcher(QObject):
             if self._round_responses.get(ai_name) is None:
                 self._round_responses[ai_name] = None
 
-        context_block = (
-            f"User prompt: {self._round_prompt}\n"
-            f"Claude: {self._round_responses.get('claude')}\n"
-            f"ChatGPT: {self._round_responses.get('chatgpt')}\n"
-            f"Grok: {self._round_responses.get('grok')}\n"
-            f"Copilot: {self._round_responses.get('copilot')}"
-        )
+        # Provider-only synthesis context (no user prompt / task directives).
+        provider_context_parts = []
+        for ai_name in ["claude", "chatgpt", "grok", "copilot"]:
+            value = self._round_responses.get(ai_name)
+            if isinstance(value, str):
+                cleaned = value.strip()
+                if cleaned:
+                    provider_context_parts.append(cleaned)
+        context_block = "\n\n".join(provider_context_parts)
 
         local_handler = self.providers.get("local")
-        if local_handler:
+        should_trigger = True
+        if local_handler is not None and hasattr(local_handler, "__self__"):
+            local_provider = local_handler.__self__
+            if hasattr(local_provider, "should_synthesize_on_round_complete"):
+                should_trigger = bool(local_provider.should_synthesize_on_round_complete())
+
+        if local_handler and should_trigger and context_block.strip():
             local_handler(context_block, self._round_role)
 
         self._round_active = False
