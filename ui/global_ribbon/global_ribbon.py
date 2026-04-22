@@ -1,7 +1,7 @@
 # ui/global_ribbon/global_ribbon.py
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QApplication, QPushButton
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ui.global_ribbon.mode_switch import ModeSwitch
 from ui.global_ribbon.theme_switch import ThemeSwitch
@@ -13,6 +13,8 @@ from core.column_manager import ColumnManager
 
 
 class GlobalRibbon(QWidget):
+    db_view_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -26,11 +28,14 @@ class GlobalRibbon(QWidget):
         self.theme_switch = ThemeSwitch()
         self.glow_switch = GlowSwitch()
         self.collapse_all = CollapseAll()
+        self.db_view_button = QPushButton("DB View")
+        self.db_view_button.setFixedHeight(40)
 
         layout.addWidget(self.mode_switch)
         layout.addWidget(self.theme_switch)
         layout.addWidget(self.glow_switch)
         layout.addWidget(self.collapse_all)
+        layout.addWidget(self.db_view_button)
 
         self.setLayout(layout)
 
@@ -40,6 +45,7 @@ class GlobalRibbon(QWidget):
         self.collapse_all.collapse_all_clicked.connect(
             ColumnManager.instance().hide_all
         )
+        self.db_view_button.clicked.connect(self.db_view_clicked.emit)
 
     def _on_mode_changed(self, mode: str):
         win = QApplication.instance().activeWindow()

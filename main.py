@@ -20,6 +20,7 @@ from ui.prompt.prompt_bar import PromptBar
 from ui.prompt.target_selector import TargetSelector, SelectAllButton
 
 from ui.global_ribbon.global_ribbon import GlobalRibbon
+from ui.db_view_dialog import DBViewDialog
 
 from ui.panels.top.claude_top import ClaudeTop
 from ui.panels.bottom.claude_chat import ClaudeChat
@@ -129,10 +130,13 @@ class DeckHUD(QMainWindow):
         self.prompt_bar = PromptBar(self.dispatcher)
         root.addWidget(self.prompt_bar)
 
+        self.db_view_dialog = DBViewDialog(self)
+
         # -------------------------
         # WIRING
         # -------------------------
         self.target_selector.targets_changed.connect(self.prompt_bar.set_targets)
+        self.ribbon.db_view_clicked.connect(self._open_db_view)
 
         self.select_all_button.all_selected.connect(
             lambda: self.prompt_bar.set_targets(
@@ -180,6 +184,12 @@ class DeckHUD(QMainWindow):
         self.dispatcher.register_provider("grok", self.grok_provider.provider_handler)
         self.dispatcher.register_provider("copilot", self.copilot_provider.provider_handler)
         self.dispatcher.register_provider("local", self.local_provider.provider_handler)
+
+    def _open_db_view(self):
+        self.db_view_dialog.refresh_rows()
+        self.db_view_dialog.show()
+        self.db_view_dialog.raise_()
+        self.db_view_dialog.activateWindow()
 
     # -------------------------
     # APPLY STYLESHEET
