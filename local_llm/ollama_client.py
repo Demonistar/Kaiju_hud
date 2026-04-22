@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import threading
 import time
 import requests
@@ -65,6 +66,13 @@ class OllamaClient:
     def set_mode(self, mode: str):
         """Set Bobby Bee mode."""
         self.observer_mode = mode
+
+    def should_synthesize_on_round_complete(self) -> bool:
+        """
+        Auto-synthesis trigger gate.
+        Bobby should only synthesize on round completion in participate/command modes.
+        """
+        return self.observer_mode in {"participate", "command"}
 
     def observe(self, content: str) -> str:
         """Silent absorption mode."""
@@ -183,20 +191,30 @@ class OllamaClient:
             self._dispatcher.on_provider_response("local", response, message_id)
             return
 
-        self._derive_topic_keywords(content)
+        synthesis_context = self._filter_synthesis_context(content)
+        if not synthesis_context:
+            self._emit_status("[Idle] No provider response context to synthesize")
+            return
+
+        self._derive_topic_keywords(synthesis_context)
         self._emit_status("[Thinking] Generating response")
-        response = self.generate(content)
+        response = self.generate(synthesis_context)
         if self.observer_mode == "command":
             response = "[COMMAND MODE] " + response
 
+        is_contaminated = self._is_instruction_contaminated(response)
         if self._current_key_id is not None:
-            self._emit_status("[Cataloging] Saving response")
-            self._db.update_response(self._current_key_id, "bobby_response", response)
+            if is_contaminated:
+                self._emit_status("[Cataloging] Skipped contaminated response persistence")
+            else:
+                self._emit_status("[Cataloging] Saving response")
+                self._db.update_response(self._current_key_id, "bobby_response", response)
 
         message_id = f"local-{self._dispatcher._now_ms()}"
         self._dispatcher.on_provider_response("local", response, message_id)
 
-        self._scan_and_write_lesson()
+        if not is_contaminated:
+            self._scan_and_write_lesson()
 
     def _derive_topic_keywords(self, content: str):
         text = (content or "").strip()
@@ -218,6 +236,46 @@ class OllamaClient:
                 break
         self._current_topic = topic
         self._current_keywords = ",".join(deduped)
+
+    def _filter_synthesis_context(self, content: str) -> str:
+        """
+        Keep only provider response text for synthesis.
+        Removes UI/system/task/instruction formatting lines.
+        """
+        text = (content or "").strip()
+        if not text:
+            return ""
+
+        filtered_lines = []
+        banned_prefix_re = re.compile(
+            r"^\s*(user prompt|task|tasks|instruction|instructions|format|formatting rules|system)\s*:",
+            re.IGNORECASE,
+        )
+        provider_label_re = re.compile(r"^\s*(claude|chatgpt|grok|copilot)\s*:\s*", re.IGNORECASE)
+
+        for raw_line in text.splitlines():
+            line = raw_line.rstrip()
+            if not line.strip():
+                filtered_lines.append("")
+                continue
+            if banned_prefix_re.match(line):
+                continue
+            cleaned_line = provider_label_re.sub("", line).strip()
+            if cleaned_line:
+                filtered_lines.append(cleaned_line)
+
+        filtered = "\n".join(filtered_lines)
+        filtered = re.sub(r"\n{3,}", "\n\n", filtered).strip()
+        return filtered
+
+    def _is_instruction_contaminated(self, text: str) -> bool:
+        if not text:
+            return False
+        contamination_re = re.compile(
+            r"(?:^|\n)\s*(user prompt|task|tasks|instruction|instructions|format|formatting rules)\s*:",
+            re.IGNORECASE,
+        )
+        return bool(contamination_re.search(text))
 
     def _scan_and_write_lesson(self):
         if self._current_key_id is None:
