@@ -48,9 +48,6 @@ class Dispatcher(QObject):
         if not targets:
             return
 
-        if role == "user":
-            self._scroll_active_chat_panels_to_top()
-
         # Expand 'all'
         if "all" in targets:
             targets = list(self.providers.keys())
@@ -89,6 +86,9 @@ class Dispatcher(QObject):
                 key_id = local_provider._db.open_round(session_id, content, active_targets)
                 local_provider._current_key_id = key_id
 
+        if role == "user" and "local" in active_targets:
+            self.user_message_signal.emit("local", content)
+
         delay_ms = 0
         step_ms = 1500
         fired = []
@@ -117,6 +117,9 @@ class Dispatcher(QObject):
 
             QTimer.singleShot(delay_ms, _invoke_provider)
             delay_ms += step_ms
+
+        if role == "user":
+            self._scroll_active_chat_panels_to_top()
 
         if not fired:
             self._finalize_round()
