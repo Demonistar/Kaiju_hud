@@ -346,3 +346,12 @@ class KaijuDatabase:
             """
         )
         return [dict(r) for r in cur.fetchall()]
+
+    def get_max_key_id(self):
+        cur = self.conn.cursor()
+        cur.execute("SELECT MAX(key_id) AS max_key_id FROM full_sessions")
+        row = cur.fetchone()
+        if not row:
+            return 0
+        max_key_id = row["max_key_id"]
+        return int(max_key_id) if max_key_id is not None else 0
