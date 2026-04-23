@@ -181,8 +181,6 @@ class OllamaClient:
 
     def _emit_status(self, status: str):
         """Emit lightweight local-only UI status without touching persistence."""
-        if self.observer_mode == "observer" and not self._observer_debug_enabled:
-            return
         message = status.strip()
         if not message or message == self._last_status_message:
             return
@@ -216,7 +214,7 @@ class OllamaClient:
         if self.observer_mode == "observer":
             if not is_synthesis_round:
                 self._derive_topic_keywords(content)
-            self._emit_observer_debug_notice("[NOTICE] Observer mode active; response suppressed")
+            self._emit_status("[NOTICE] Observer mode active; response suppressed")
             return
 
         if is_synthesis_round:
@@ -406,11 +404,11 @@ class OllamaClient:
                             )
                             if self._dispatcher is not None:
                                 if self.observer_mode == "observer":
-                                    self._emit_observer_debug_notice(notice)
+                                    self._emit_status(notice)
                                 else:
                                     message_id = f"local-{self._dispatcher._now_ms()}"
                                     self._dispatcher.on_provider_response("local", notice, message_id)
-                            if row.get("bobby_response") is None:
+                            if self.observer_mode != "observer" and row.get("bobby_response") is None:
                                 self._db.update_late_response(key_id, "bobby_response", notice)
                         seen[col] = curr
                     if key_id > self._watcher_last_seen_key_id:
