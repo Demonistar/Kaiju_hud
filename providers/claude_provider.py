@@ -2,6 +2,7 @@
 
 import uuid
 import time
+import re
 import requests
 from PyQt6.QtCore import QThread, pyqtSignal
 from core.file_broker import FileBroker
@@ -100,6 +101,7 @@ class ClaudeProvider:
         self._worker = None
         self._broker = FileBroker()
         self._build_mode = True
+        self._allow_project_tools_for_turn = False
 
     def bind(self, dispatcher):
         self._dispatcher = dispatcher
@@ -113,7 +115,10 @@ class ClaudeProvider:
             self._dispatcher.on_provider_response("claude", f"[Claude stubbed response to: {content}]", message_id)
             return
 
-        if self._build_mode:
+        request_class = self._classify_request_scope(content)
+        self._allow_project_tools_for_turn = self._build_mode and request_class == "project_local"
+
+        if self._allow_project_tools_for_turn:
             content = FILE_SYSTEM_PREFIX + "\n\n" + content
 
         self._worker = ClaudeWorker(
@@ -124,11 +129,15 @@ class ClaudeProvider:
         self._worker.start()
 
     def _on_worker_done(self, response: str, message_id: str):
-        processed = self._handle_file_ops(response)
+        processed = self._handle_file_ops(response, allow_project_tools=self._allow_project_tools_for_turn)
+        self._allow_project_tools_for_turn = False
         if self._dispatcher:
             self._dispatcher.on_provider_response("claude", processed, message_id)
 
-    def _handle_file_ops(self, response: str) -> str:
+    def _handle_file_ops(self, response: str, allow_project_tools: bool) -> str:
+        if not allow_project_tools:
+            return self._strip_file_op_lines(response)
+
         if "READ:" not in response and "WRITE:" not in response:
             return response
 
@@ -163,3 +172,72 @@ class ClaudeProvider:
                 i += 1
 
         return "\n".join(output_lines)
+
+    def _classify_request_scope(self, content: str) -> str:
+        text = (content or "").strip().lower()
+        if not text:
+            return "general"
+
+        explicit_non_project_patterns = [
+            r"\bnot about (?:the )?(?:project|codebase|repo(?:sitory)?|local code)\b",
+            r"\bnot (?:for|about) (?:kaiju hud|kaiju_hud)\b",
+            r"\bdon'?t use (?:the )?(?:project|codebase|repo(?:sitory)?|local files?)\b",
+        ]
+        if any(re.search(p, text) for p in explicit_non_project_patterns):
+            return "general"
+
+        project_markers = (
+            "kaiju hud",
+            "kaiju_hud",
+            "this repo",
+            "this repository",
+            "this codebase",
+            "local code",
+            "project file",
+            "filebroker",
+            "providers/",
+            "local_llm/",
+            "core/",
+        )
+        if any(marker in text for marker in project_markers):
+            return "project_local"
+
+        api_markers = (
+            "anthropic",
+            "claude api",
+            "console.anthropic.com",
+            "agents",
+            "platform",
+            "sdk",
+            "documentation",
+            "docs",
+        )
+        if any(marker in text for marker in api_markers):
+            return "general_api"
+
+        return "general"
+
+    def _strip_file_op_lines(self, response: str) -> str:
+        if "READ:" not in response and "WRITE:" not in response:
+            return response
+
+        lines = response.split("\n")
+        cleaned = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if line.startswith("READ:"):
+                i += 1
+                continue
+            if line.startswith("WRITE:"):
+                i += 1
+                if i < len(lines) and lines[i].strip() == "<<<FILE_CONTENT>>>":
+                    i += 1
+                while i < len(lines) and lines[i].strip() != "<<<END>>>":
+                    i += 1
+                if i < len(lines) and lines[i].strip() == "<<<END>>>":
+                    i += 1
+                continue
+            cleaned.append(line)
+            i += 1
+        return "\n".join(cleaned).strip() or "I can help without project files. Please clarify your question."

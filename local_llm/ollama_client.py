@@ -51,6 +51,7 @@ class OllamaClient:
         self._watcher_last_seen_key_id = 0
         self._last_status_message = None
         self._observer_debug_enabled = False
+        self._observer_visible_prefixes = ("[Reading]", "[Filing]", "[Cataloging]", "[NOTICE]", "[Notes]")
 
         self._load_cached_location()
         self._detect_ollama()
@@ -184,9 +185,14 @@ class OllamaClient:
         message = status.strip()
         if not message or message == self._last_status_message:
             return
+        if self.observer_mode == "observer" and not self._is_allowed_observer_status(message):
+            return
         self._last_status_message = message
         if self._dispatcher is not None:
             self._dispatcher.response_signal.emit("local", message)
+
+    def _is_allowed_observer_status(self, message: str) -> bool:
+        return message.startswith(self._observer_visible_prefixes)
 
     def _emit_observer_debug_notice(self, notice: str):
         """Emit observer-mode debug notice only when explicitly enabled."""
