@@ -200,7 +200,9 @@ class KaijuDatabase:
 
     def __init__(self):
         os.makedirs("storage", exist_ok=True)
-        self.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        abs_db_path = os.path.abspath(DB_PATH)
+        self.conn = sqlite3.connect(abs_db_path, check_same_thread=False)
+        print(f"[DB INIT] {abs_db_path}")
         self.conn.row_factory = sqlite3.Row
         self._create_full_sessions_table()
 
@@ -227,7 +229,9 @@ class KaijuDatabase:
             ),
         )
         self.conn.commit()
-        return cur.lastrowid
+        key_id = cur.lastrowid
+        print(f"[DB OPEN ROUND] key_id={key_id} prompt={user_prompt}")
+        return key_id
 
     def update_response(self, key_id, column_name, value):
         self._validate_column(column_name)
