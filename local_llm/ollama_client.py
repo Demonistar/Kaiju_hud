@@ -50,6 +50,7 @@ class OllamaClient:
         self._watcher_seen = {}
         self._watcher_last_seen_key_id = 0
         self._last_status_message = None
+        self._observer_debug_enabled = False
 
         self._load_cached_location()
         self._detect_ollama()
@@ -68,12 +69,22 @@ class OllamaClient:
         """Set Bobby Bee mode."""
         self.observer_mode = mode
 
+    def set_observer_debug(self, enabled: bool):
+        """Enable/disable observer-mode debug output."""
+        self._observer_debug_enabled = bool(enabled)
+
     def should_synthesize_on_round_complete(self) -> bool:
         """
         Auto-synthesis trigger gate.
         Bobby should only synthesize on round completion in participate/command modes.
         """
         return self.observer_mode in {"participate", "command"}
+
+    def should_emit_user_response(self, role: str) -> bool:
+        """Whether this turn is allowed to produce a user-facing local reply."""
+        if self.observer_mode == "observer":
+            return False
+        return role in {"user", "synthesis"}
 
     def observe(self, content: str) -> str:
         """Silent absorption mode."""
@@ -170,12 +181,26 @@ class OllamaClient:
 
     def _emit_status(self, status: str):
         """Emit lightweight local-only UI status without touching persistence."""
+        if self.observer_mode == "observer" and not self._observer_debug_enabled:
+            return
         message = status.strip()
         if not message or message == self._last_status_message:
             return
         self._last_status_message = message
         if self._dispatcher is not None:
             self._dispatcher.response_signal.emit("local", message)
+
+    def _emit_observer_debug_notice(self, notice: str):
+        """Emit observer-mode debug notice only when explicitly enabled."""
+        if self.observer_mode != "observer" or not self._observer_debug_enabled:
+            return
+        if self._dispatcher is None:
+            return
+        message = (notice or "").strip()
+        if not message:
+            return
+        message_id = f"local-{self._dispatcher._now_ms()}"
+        self._dispatcher.on_provider_response("local", message, message_id)
 
     # ---------------------------------------------------------
     # PROVIDER HANDLER
@@ -189,9 +214,9 @@ class OllamaClient:
         is_synthesis_round = role == "synthesis"
 
         if self.observer_mode == "observer":
-            response = "[Absorbed]"
-            message_id = f"local-{self._dispatcher._now_ms()}"
-            self._dispatcher.on_provider_response("local", response, message_id)
+            if not is_synthesis_round:
+                self._derive_topic_keywords(content)
+            self._emit_observer_debug_notice("[NOTICE] Observer mode active; response suppressed")
             return
 
         if is_synthesis_round:
@@ -380,8 +405,11 @@ class OllamaClient:
                                 f"{elapsed}: {resp_snippet}"
                             )
                             if self._dispatcher is not None:
-                                message_id = f"local-{self._dispatcher._now_ms()}"
-                                self._dispatcher.on_provider_response("local", notice, message_id)
+                                if self.observer_mode == "observer":
+                                    self._emit_observer_debug_notice(notice)
+                                else:
+                                    message_id = f"local-{self._dispatcher._now_ms()}"
+                                    self._dispatcher.on_provider_response("local", notice, message_id)
                             if row.get("bobby_response") is None:
                                 self._db.update_late_response(key_id, "bobby_response", notice)
                         seen[col] = curr
