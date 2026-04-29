@@ -1,6 +1,6 @@
 # ui/panels/top/claude_top.py
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QHBoxLayout, QVBoxLayout
 
@@ -10,6 +10,7 @@ from core.column_manager import ColumnManager
 
 
 class ClaudeTop(QFrame):
+    relay_clicked = pyqtSignal(str)
     """
     Collapsible top panel for the Claude column.
     Shows project name, session name, and status indicator.
@@ -36,6 +37,11 @@ class ClaudeTop(QFrame):
         self.status_label.setStyleSheet("color: #00FF88;")  # active green
 
         # Collapse button
+        self.relay_btn = QPushButton("Relay")
+        self.relay_btn.setFixedHeight(22)
+        self.relay_btn.clicked.connect(lambda: self.relay_clicked.emit("claude"))
+        GlowManager().register_widget(self.relay_btn, intensity="subtle")
+
         self.collapse_btn = QPushButton("⮝")
         self.collapse_btn.setFixedSize(28, 28)
         self.collapse_btn.clicked.connect(lambda: ColumnManager().toggle("claude"))
@@ -48,6 +54,7 @@ class ClaudeTop(QFrame):
 
         right = QVBoxLayout()
         right.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignRight)
+        right.addWidget(self.relay_btn, alignment=Qt.AlignmentFlag.AlignRight)
         right.addWidget(self.collapse_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
         row = QHBoxLayout()

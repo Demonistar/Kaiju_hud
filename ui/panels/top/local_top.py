@@ -11,6 +11,7 @@ from ui.widgets.local_eye_indicator import LocalEyeIndicator
 
 
 class LocalTop(QFrame):
+    relay_clicked = pyqtSignal(str)
     mode_changed = pyqtSignal(str)
     """
     Collapsible top panel for the Local column.
@@ -36,6 +37,11 @@ class LocalTop(QFrame):
         self.status_label.setFont(QFont("Segoe UI", 14))
         self.status_label.setStyleSheet("color: #00FF88;")
 
+        self.relay_btn = QPushButton("Relay")
+        self.relay_btn.setFixedHeight(22)
+        self.relay_btn.clicked.connect(lambda: self.relay_clicked.emit("local"))
+        GlowManager().register_widget(self.relay_btn, intensity="subtle")
+
         self.collapse_btn = QPushButton("⮝")
         self.collapse_btn.setFixedSize(28, 28)
         self.collapse_btn.clicked.connect(lambda: ColumnManager().toggle("local"))
@@ -58,6 +64,7 @@ class LocalTop(QFrame):
 
         right = QVBoxLayout()
         right.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignRight)
+        right.addWidget(self.relay_btn, alignment=Qt.AlignmentFlag.AlignRight)
         right.addWidget(self.collapse_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
         row = QHBoxLayout()

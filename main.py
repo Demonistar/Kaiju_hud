@@ -61,6 +61,7 @@ class DeckHUD(QMainWindow):
         app_state.set_window_mode(self.settings.get_last_window_mode())
 
         self.dispatcher = Dispatcher()
+        self.current_targets = []
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -136,12 +137,14 @@ class DeckHUD(QMainWindow):
         # WIRING
         # -------------------------
         self.target_selector.targets_changed.connect(self.prompt_bar.set_targets)
+        self.target_selector.targets_changed.connect(self._on_targets_changed)
         self.ribbon.db_view_clicked.connect(self._open_db_view)
 
         self.select_all_button.all_selected.connect(
-            lambda: self.prompt_bar.set_targets(
-                ["claude", "chatgpt", "grok", "copilot", "local"]
-            )
+            lambda: self._on_targets_changed(["claude", "chatgpt", "grok", "copilot", "local"])
+        )
+        self.select_all_button.all_selected.connect(
+            lambda: self.prompt_bar.set_targets(["claude", "chatgpt", "grok", "copilot", "local"])
         )
 
         # -------------------------
@@ -153,6 +156,9 @@ class DeckHUD(QMainWindow):
         cm.register("grok", self.grok_top, self.grok_chat)
         cm.register("copilot", self.copilot_top, self.copilot_chat)
         cm.register("local", self.local_top, self.local_chat)
+
+        for panel in [self.claude_top, self.chatgpt_top, self.grok_top, self.copilot_top, self.local_top]:
+            panel.relay_clicked.connect(self._on_relay_clicked)
 
         # -------------------------
         # PROVIDERS + API KEYS
@@ -190,6 +196,12 @@ class DeckHUD(QMainWindow):
         self.db_view_dialog.show()
         self.db_view_dialog.raise_()
         self.db_view_dialog.activateWindow()
+
+    def _on_targets_changed(self, targets):
+        self.current_targets = list(targets)
+
+    def _on_relay_clicked(self, source_ai: str):
+        self.dispatcher.relay_last_response(source_ai, self.current_targets)
 
     # -------------------------
     # APPLY STYLESHEET
