@@ -3,6 +3,7 @@
 from PyQt6.QtCore import QObject, pyqtSignal, QDateTime, QTimer
 from typing import List, Dict, Callable
 from core.column_manager import ColumnManager
+from core.settings_manager import SettingsManager
 
 
 class Dispatcher(QObject):
@@ -31,6 +32,8 @@ class Dispatcher(QObject):
         self._round_timed_out = set()
         self._round_finalized = False
         self._round_synthesis_sent = False
+        self._latest_ai_responses: Dict[str, str] = {}
+        self._settings = SettingsManager()
 
     # ---------- PUBLIC API ----------
 
@@ -82,6 +85,8 @@ class Dispatcher(QObject):
         self._round_timed_out = set()
         self._round_finalized = False
         self._round_synthesis_sent = False
+        self._latest_ai_responses: Dict[str, str] = {}
+        self._settings = SettingsManager()
 
         local_handler = self.providers.get("local")
         if local_handler is not None and hasattr(local_handler, "__self__"):
@@ -155,6 +160,59 @@ class Dispatcher(QObject):
 
         QTimer.singleShot(delay_ms, _start_timeouts)
 
+
+    def relay_last_response(self, source_ai: str, selected_targets: List[str]):
+        source_text = self._latest_relayable_response(source_ai)
+        if not source_text:
+            return
+        targets = [t for t in selected_targets if t != source_ai]
+        self.relay_ai_response(source_ai, source_text, targets)
+
+    def relay_ai_response(self, source_ai: str, source_text: str, target_list: List[str]):
+        if not source_text or not target_list:
+            return
+        active_targets = [ai_name for ai_name in ["claude", "chatgpt", "grok", "copilot", "local"] if ai_name in target_list and ai_name in self.providers and ColumnManager.instance().is_active(ai_name)]
+        if not active_targets:
+            return
+        wrapped_prompt = (
+            "You are receiving an output from another AI in the Kaiju Command Bridge.\n\n"
+            f"Source AI: {source_ai.title()}\n\n"
+            "Your task:\n"
+            "- Analyze the source AI’s response\n"
+            "- Identify what is valuable or correct\n"
+            "- Identify anything you disagree with\n"
+            "- Identify missing context, risks, or weak assumptions\n"
+            "- Recommend improvements or alternatives, especially if they contradict the source response\n\n"
+            "Do not respond to the source AI directly.\n"
+            "Respond to the user with your analysis.\n\n"
+            "--- BEGIN SOURCE AI RESPONSE ---\n"
+            f"{source_text}\n"
+            "--- END SOURCE AI RESPONSE ---"
+        )
+        hidden_suffix = ""
+        if self._settings.get_hidden_prompt_enabled():
+            profile = self._settings.get_hidden_prompt_profile()
+            hidden_suffix = self._settings.get_hidden_prompt_text(profile).strip()
+        provider_content = wrapped_prompt if not hidden_suffix else f"{wrapped_prompt}\n\n{hidden_suffix}"
+        now_ms = self._now_ms()
+        for ai_name in active_targets:
+            message_id = self._make_message_id(ai_name)
+            self._pending[message_id] = now_ms
+            self._log_outbound(ai_name, provider_content, "relay", message_id, now_ms)
+            handler_ref = self.providers.get(ai_name)
+            if handler_ref:
+                handler_ref(provider_content, "relay")
+
+    def _latest_relayable_response(self, ai_name: str) -> str:
+        content = (self._latest_ai_responses.get(ai_name) or "").strip()
+        if not content:
+            return ""
+        if ai_name == "local":
+            status_prefixes = ("[NOTICE]", "[Reading]", "[Filing]", "[Cataloging]", "[Thinking]", "[Notes]")
+            if any(content.startswith(prefix) for prefix in status_prefixes):
+                return ""
+        return content
+
     # ---------- PROVIDER CALLBACKS ----------
 
     def on_provider_chunk(self, ai_name: str, chunk: str):
@@ -168,6 +226,7 @@ class Dispatcher(QObject):
         response_time_ms = max(0, now_ms - start_ms)
 
         self._log_inbound(ai_name, content, message_id, now_ms, response_time_ms)
+        self._latest_ai_responses[ai_name] = content
         self.on_response_received(ai_name, content, response_time_ms)
 
         if self._round_active and ai_name in self._round_responses and not self._round_finalized:
