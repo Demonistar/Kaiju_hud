@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QHBoxLayout, QVBoxLayout
+from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QSizePolicy
 
 from core.glow_manager import GlowManager
 from core.app_state import AppState
@@ -36,7 +36,8 @@ class ChatGPTTop(QFrame):
         self.status_label.setStyleSheet("color: #00FF88;")
 
         self.relay_btn = QPushButton("Relay")
-        self.relay_btn.setFixedHeight(22)
+        self.relay_btn.setFixedSize(70, 22)
+        self.relay_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.relay_btn.clicked.connect(lambda: self.relay_clicked.emit("chatgpt"))
         GlowManager().register_widget(self.relay_btn, intensity="subtle")
 
