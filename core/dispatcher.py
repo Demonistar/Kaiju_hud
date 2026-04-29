@@ -33,6 +33,7 @@ class Dispatcher(QObject):
         self._round_finalized = False
         self._round_synthesis_sent = False
         self._settings = SettingsManager()
+        self._latest_ai_responses: Dict[str, str] = {}
 
     # ---------- PUBLIC API ----------
 
@@ -160,6 +161,8 @@ class Dispatcher(QObject):
 
 
     def relay_last_response(self, source_ai: str, selected_targets: List[str]):
+        if not source_ai:
+            return
         source_text = self._latest_relayable_response(source_ai)
         if not source_text:
             return
