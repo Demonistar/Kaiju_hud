@@ -32,7 +32,6 @@ class Dispatcher(QObject):
         self._round_timed_out = set()
         self._round_finalized = False
         self._round_synthesis_sent = False
-        self._latest_ai_responses: Dict[str, str] = {}
         self._settings = SettingsManager()
 
     # ---------- PUBLIC API ----------
@@ -85,7 +84,6 @@ class Dispatcher(QObject):
         self._round_timed_out = set()
         self._round_finalized = False
         self._round_synthesis_sent = False
-        self._latest_ai_responses: Dict[str, str] = {}
         self._settings = SettingsManager()
 
         local_handler = self.providers.get("local")
@@ -171,12 +169,20 @@ class Dispatcher(QObject):
     def relay_ai_response(self, source_ai: str, source_text: str, target_list: List[str]):
         if not source_text or not target_list:
             return
+        source_label_map = {
+            "claude": "Claude",
+            "chatgpt": "ChatGPT",
+            "grok": "Grok",
+            "copilot": "Copilot",
+            "local": "Local",
+        }
+        source_label = source_label_map.get(source_ai, source_ai)
         active_targets = [ai_name for ai_name in ["claude", "chatgpt", "grok", "copilot", "local"] if ai_name in target_list and ai_name in self.providers and ColumnManager.instance().is_active(ai_name)]
         if not active_targets:
             return
         wrapped_prompt = (
             "You are receiving an output from another AI in the Kaiju Command Bridge.\n\n"
-            f"Source AI: {source_ai.title()}\n\n"
+            f"Source AI: {source_label}\n\n"
             "Your task:\n"
             "- Analyze the source AI’s response\n"
             "- Identify what is valuable or correct\n"
