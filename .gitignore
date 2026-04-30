@@ -1,0 +1,18 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# SQLite databases (runtime-generated)
+*.db
+
+# Projects folder (created at runtime by FileBroker)
+kaiju_hud/Projects/
+
+# Playwright browser session (contains login cookies — never commit)
+kaiju_hud/config/copilot_session/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
