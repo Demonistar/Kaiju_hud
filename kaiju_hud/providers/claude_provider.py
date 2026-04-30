@@ -3,6 +3,29 @@
 import uuid
 import json
 import httpx
+from pathlib import Path
+
+
+def _get_file_system_prefix() -> str:
+    # providers/claude_provider.py is at kaiju_hud/providers/claude_provider.py
+    # root is two levels up from this file
+    root = Path(__file__).resolve().parent.parent
+    return (
+        f"You have direct read/write access to the Kaiju HUD project at {root} via FileBroker.\n\n"
+        "To read a file, respond with exactly:\n"
+        "READ: path/to/file.py\n\n"
+        "To write a file, respond with exactly:\n"
+        "WRITE: path/to/file.py\n"
+        "<<<FILE_CONTENT>>>\n"
+        "(complete file contents here)\n"
+        "<<<END>>>\n\n"
+        "You can chain multiple READ and WRITE commands in one response.\n"
+        "The HUD will execute them and show you the results.\n"
+        f"Project root: {root}\n"
+    )
+
+
+FILE_SYSTEM_PREFIX = _get_file_system_prefix()
 
 SYSTEM_PROMPT = ""
 
@@ -27,6 +50,9 @@ class ClaudeProvider:
         self._dispatcher = None
         self.message_history = []
         self.model = "claude-sonnet-4-5"
+        # Instantiate FileBroker to ensure Projects/ folder is created at startup
+        from core.file_broker import FileBroker
+        self._broker = FileBroker()
 
     # ---------------------------------------------------------
     # DISPATCHER BINDING
