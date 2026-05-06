@@ -1,6 +1,7 @@
 # main.py
 
 import sys
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout
 
 from core.dispatcher import Dispatcher
@@ -158,7 +159,7 @@ class DeckHUD(QMainWindow):
         cm.register("local", self.local_top, self.local_chat)
 
         for panel in [self.claude_top, self.chatgpt_top, self.grok_top, self.copilot_top, self.local_top]:
-            panel.relay_clicked.connect(self._on_relay_clicked)
+            panel.relay_clicked.connect(self._on_relay_clicked, Qt.ConnectionType.UniqueConnection)
 
         # -------------------------
         # PROVIDERS + API KEYS
@@ -201,7 +202,8 @@ class DeckHUD(QMainWindow):
         self.current_targets = list(targets)
 
     def _on_relay_clicked(self, source_ai: str):
-        self.dispatcher.relay_last_response(source_ai, self.current_targets)
+        final_targets = self.dispatcher.relay_last_response(source_ai, self.current_targets)
+        print(f"[Relay Debug] source_ai={source_ai}, final_targets={final_targets}")
 
     # -------------------------
     # APPLY STYLESHEET

@@ -162,12 +162,31 @@ class Dispatcher(QObject):
 
     def relay_last_response(self, source_ai: str, selected_targets: List[str]):
         if not source_ai:
-            return
+            return []
         source_text = self._latest_relayable_response(source_ai)
         if not source_text:
-            return
-        targets = [t for t in selected_targets if t != source_ai]
-        self.relay_ai_response(source_ai, source_text, targets)
+            return []
+
+        valid_known_ais = {"claude", "chatgpt", "grok", "copilot", "local"}
+        unique_targets = []
+        seen = set()
+        for target in selected_targets:
+            if target in seen:
+                continue
+            seen.add(target)
+            if target == source_ai:
+                continue
+            if target not in valid_known_ais:
+                continue
+            if target not in self.providers:
+                continue
+            unique_targets.append(target)
+
+        if not unique_targets:
+            return []
+
+        self.relay_ai_response(source_ai, source_text, unique_targets)
+        return unique_targets
 
     def relay_ai_response(self, source_ai: str, source_text: str, target_list: List[str]):
         if not source_text or not target_list:
@@ -180,7 +199,12 @@ class Dispatcher(QObject):
             "local": "Local",
         }
         source_label = source_label_map.get(source_ai, source_ai)
-        active_targets = [ai_name for ai_name in ["claude", "chatgpt", "grok", "copilot", "local"] if ai_name in target_list and ai_name in self.providers and ColumnManager.instance().is_active(ai_name)]
+        active_targets = []
+        seen_active = set()
+        for ai_name in ["claude", "chatgpt", "grok", "copilot", "local"]:
+            if ai_name in target_list and ai_name not in seen_active and ai_name in self.providers and ColumnManager.instance().is_active(ai_name):
+                active_targets.append(ai_name)
+                seen_active.add(ai_name)
         if not active_targets:
             return
         wrapped_prompt = (
@@ -207,10 +231,10 @@ class Dispatcher(QObject):
         for ai_name in active_targets:
             message_id = self._make_message_id(ai_name)
             self._pending[message_id] = now_ms
-            self._log_outbound(ai_name, provider_content, "relay", message_id, now_ms)
+            self._log_outbound(ai_name, provider_content, "user", message_id, now_ms)
             handler_ref = self.providers.get(ai_name)
             if handler_ref:
-                handler_ref(provider_content, "relay")
+                handler_ref(provider_content, "user")
 
     def _latest_relayable_response(self, ai_name: str) -> str:
         content = (self._latest_ai_responses.get(ai_name) or "").strip()
