@@ -18,7 +18,7 @@ class Dispatcher(QObject):
         # Provider registry: ai_name -> handler(content, role)
         self.providers: Dict[str, Callable[[str, str], None]] = {}
 
-        # Optional DB client (stubbed in Phase 1)
+        # Optional DB client
         self.db = db_client
 
         # Track in‑flight messages for response time
