@@ -112,7 +112,7 @@ class ClaudeProvider:
     def provider_handler(self, content: str, role: str):
         if not self.api_key:
             message_id = f"claude-{uuid.uuid4().hex}"
-            self._dispatcher.on_provider_response("claude", f"[Claude stubbed response to: {content}]", message_id)
+            self._dispatcher.on_provider_response("claude", "[Claude API error: missing API key]", message_id)
             return
 
         request_class = self._classify_request_scope(content)

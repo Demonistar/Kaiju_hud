@@ -95,7 +95,7 @@ class ChatGPTProvider:
     def provider_handler(self, content: str, role: str):
         if not self.api_key:
             message_id = f"chatgpt-{uuid.uuid4().hex}"
-            self._dispatcher.on_provider_response("chatgpt", f"[ChatGPT stubbed response to: {content}]", message_id)
+            self._dispatcher.on_provider_response("chatgpt", "[ChatGPT API error: missing API key]", message_id)
             return
 
         self._worker = ChatGPTWorker(

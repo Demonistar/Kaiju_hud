@@ -100,7 +100,7 @@ class GrokProvider:
     def provider_handler(self, content: str, role: str = "user"):
         if not self.api_key:
             message_id = f"grok-{uuid.uuid4().hex}"
-            self._dispatcher.on_provider_response("grok", f"[Grok stubbed response to: {content}]", message_id)
+            self._dispatcher.on_provider_response("grok", "[Grok API error: missing API key]", message_id)
             return
 
         self._worker = GrokWorker(
